@@ -1,7 +1,7 @@
 package com.billme.security;
+import com.billme.repository.UserRepository;
 
 import com.billme.user.User;
-import com.billme.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.stereotype.Service;

@@ -1,4 +1,4 @@
-package com.billme.user;
+package com.billme.merchant;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -6,29 +6,26 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(name = "merchant_bank_details")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
+public class MerchantBankDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
-    private String email;
+    @OneToOne
+    @JoinColumn(name = "merchant_profile_id", nullable = false, unique = true)
+    private MerchantProfile merchantProfile;
 
-    @Column(nullable = false)
-    private String password;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
-
-    private boolean active = true;
+    private String bankName;
+    private String accountHolderName;
+    private String accountNumber;
+    private String ifsc;
 
     private LocalDateTime createdAt;
 
