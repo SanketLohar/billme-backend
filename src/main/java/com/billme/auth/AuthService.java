@@ -4,21 +4,21 @@ import com.billme.auth.token.RefreshToken;
 import com.billme.auth.token.RefreshTokenService;
 import com.billme.customer.CustomerProfile;
 import com.billme.repository.CustomerProfileRepository;
-import com.billme.merchant.MerchantProfile;
 import com.billme.repository.MerchantProfileRepository;
 import com.billme.repository.UserRepository;
+import com.billme.repository.WalletRepository;
 import com.billme.security.jwt.JwtService;
 import com.billme.user.Role;
 import com.billme.user.User;
 import com.billme.wallet.Wallet;
-import com.billme.repository.WalletRepository;
-
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 
@@ -40,31 +40,52 @@ public class AuthService {
     public AuthResponse registerCustomer(CustomerRegisterRequest request) {
 
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already registered");
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Email already registered"
+            );
         }
 
-        User user = new User();
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(Role.CUSTOMER);
-        user.setActive(true);
+
+        if (request.getFaceEmbeddings() == null || request.getFaceEmbeddings().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Face embedding is required"
+            );
+        }
+
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(Role.CUSTOMER)
+                .active(true)
+                .build();
 
         userRepository.save(user);
 
-        CustomerProfile profile = new CustomerProfile();
-        profile.setUser(user);
-        profile.setName(request.getName());
-        profile.setFaceEmbeddings(request.getFaceEmbeddings());
+        CustomerProfile profile = CustomerProfile.builder()
+                .user(user)
+                .name(request.getName())
+                .faceEmbeddings(request.getFaceEmbeddings())
+                .build();
 
         customerProfileRepository.save(profile);
 
-        Wallet wallet = new Wallet();
-        wallet.setUser(user);
-        wallet.setBalance(BigDecimal.ZERO);
+        Wallet wallet = Wallet.builder()
+                .user(user)
+                .balance(BigDecimal.ZERO)
+                .build();
 
         walletRepository.save(wallet);
 
-        return new AuthResponse("CUSTOMER_REGISTERED", null);
+        String accessToken = jwtService.generateAccessToken(
+                user.getEmail(),
+                user.getRole().name()
+        );
+
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+
+        return new AuthResponse(accessToken, refreshToken.getToken());
     }
 
     // ================= MERCHANT REGISTER =================
@@ -72,35 +93,48 @@ public class AuthService {
     public AuthResponse registerMerchant(MerchantRegisterRequest request) {
 
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already registered");
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Merchant already registered"
+            );
         }
 
-        User user = new User();
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(Role.MERCHANT);
-        user.setActive(true);
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(Role.MERCHANT)
+                .active(true)
+                .build();
 
         userRepository.save(user);
 
-        MerchantProfile profile = new MerchantProfile();
-        profile.setUser(user);
-        profile.setBusinessName(request.getBusinessName());
-        profile.setOwnerName(request.getOwnerName());
-        profile.setPhone(request.getPhone());
-        profile.setAddress(request.getAddress());
-        profile.setUpiId(request.getUpiId());
-        profile.setProfileCompleted(false);
+        merchantProfileRepository.save(
+                com.billme.merchant.MerchantProfile.builder()
+                        .user(user)
+                        .businessName(request.getBusinessName())
+                        .ownerName(request.getOwnerName())
+                        .phone(request.getPhone())
+                        .address(request.getAddress())
+                        .upiId(request.getUpiId())
+                        .profileCompleted(false)
+                        .build()
+        );
 
-        merchantProfileRepository.save(profile);
+        walletRepository.save(
+                Wallet.builder()
+                        .user(user)
+                        .balance(BigDecimal.ZERO)
+                        .build()
+        );
 
-        Wallet wallet = new Wallet();
-        wallet.setUser(user);
-        wallet.setBalance(BigDecimal.ZERO);
+        String accessToken = jwtService.generateAccessToken(
+                user.getEmail(),
+                user.getRole().name()
+        );
 
-        walletRepository.save(wallet);
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
-        return new AuthResponse("MERCHANT_REGISTERED", null);
+        return new AuthResponse(accessToken, refreshToken.getToken());
     }
 
     // ================= LOGIN =================
@@ -115,9 +149,11 @@ public class AuthService {
         );
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found"
+                ));
 
-        // ✅ Correct method usage
         String accessToken = jwtService.generateAccessToken(
                 user.getEmail(),
                 user.getRole().name()
