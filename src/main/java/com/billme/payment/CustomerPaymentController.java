@@ -1,6 +1,7 @@
 package com.billme.payment;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -11,7 +12,11 @@ public class CustomerPaymentController {
     private final FacePayService facePayService;
 
     @PostMapping("/{id}/pay/face")
-    public String payInvoice(@PathVariable Long id) {
-        return facePayService.payInvoice(id);
+    public ResponseEntity<String> payInvoice(
+            @PathVariable Long id,
+            @RequestBody FacePayRequest request) {
+
+        String result = facePayService.payInvoice(id, request.getEmbedding());
+        return ResponseEntity.ok(result);
     }
 }

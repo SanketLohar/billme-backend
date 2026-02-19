@@ -1,6 +1,8 @@
 package com.billme.security.jwt;
 
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
@@ -10,56 +12,53 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    private static final String SECRET_KEY =
-            "mySuperSecretKeyForBillMeApplicationThatIsVerySecure12345";
+    // 🔐 Change this secret in production
+    private static final String SECRET =
+            "my_super_secret_key_for_billme_application_very_secure_123456";
+
+    private final Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
 
     private static final long ACCESS_TOKEN_EXPIRATION = 1000 * 60 * 60; // 1 hour
-    private static final long REFRESH_TOKEN_EXPIRATION = 1000 * 60 * 60 * 24 * 7; // 7 days
 
-    private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
-    }
-
-    public String generateAccessToken(String email, String role) {
+    // ✅ Generate Access Token
+    public String generateAccessToken(String username, String role) {
 
         return Jwts.builder()
-                .setSubject(email)
+                .setSubject(username)
                 .claim("role", role)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public String generateRefreshToken(String email) {
-
-        return Jwts.builder()
-                .setSubject(email)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRATION))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
+    // ✅ Extract username
+    public String extractUsername(String token) {
+        return extractAllClaims(token).getSubject();
     }
 
-    public String extractEmail(String token) {
+    // ✅ Extract role
+    public String extractRole(String token) {
+        return extractAllClaims(token).get("role", String.class);
+    }
+
+    // ✅ Extract all claims
+    public Claims extractAllClaims(String token) {
 
         return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+                .getBody();
     }
 
+    // ✅ Validate token
     public boolean isTokenValid(String token) {
 
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token);
+            extractAllClaims(token);
             return true;
-        } catch (JwtException e) {
+        } catch (Exception e) {
             return false;
         }
     }

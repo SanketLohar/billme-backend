@@ -46,7 +46,6 @@ public class AuthService {
             );
         }
 
-
         if (request.getFaceEmbeddings() == null || request.getFaceEmbeddings().isBlank()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -87,6 +86,7 @@ public class AuthService {
 
         return new AuthResponse(accessToken, refreshToken.getToken());
     }
+
 
     // ================= MERCHANT REGISTER =================
     @Transactional

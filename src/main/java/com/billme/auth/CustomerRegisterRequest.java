@@ -9,5 +9,6 @@ public class CustomerRegisterRequest {
     private String password;
     private String name;
 
-    private String faceEmbeddings;  // Base64 string
+    // JSON string of averaged embedding from frontend
+    private String faceEmbeddings;
 }

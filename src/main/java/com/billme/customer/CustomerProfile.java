@@ -25,7 +25,8 @@ public class CustomerProfile {
 
     private String name;
 
-    @Column(columnDefinition = "TEXT")
+    @Lob
+    @Column(columnDefinition = "LONGTEXT", nullable = false)
     private String faceEmbeddings;
 
     private LocalDateTime createdAt;
