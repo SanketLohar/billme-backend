@@ -8,6 +8,9 @@ import java.util.Optional;
 
 public interface WalletRepository extends JpaRepository<Wallet, Long> {
 
+    // Fetch by User entity
     Optional<Wallet> findByUser(User user);
 
+    // 🔥 Recommended for services
+    Optional<Wallet> findByUser_Id(Long userId);
 }

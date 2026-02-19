@@ -22,7 +22,7 @@ public class Transaction {
 
     // Sender Wallet
     @ManyToOne
-    @JoinColumn(name = "sender_wallet_id")
+    @JoinColumn(name = "sender_wallet_id", nullable = false)
     private Wallet senderWallet;
 
     // Receiver Wallet (nullable for UPI external)
@@ -42,4 +42,9 @@ public class Transaction {
     private String externalReference; // for UPI txn id
 
     private LocalDateTime createdAt;
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+    }
+
 }
