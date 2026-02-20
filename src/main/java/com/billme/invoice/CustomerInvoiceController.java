@@ -2,7 +2,7 @@ package com.billme.invoice;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.security.core.Authentication;
 import java.util.List;
 
 @RestController
@@ -13,17 +13,19 @@ public class CustomerInvoiceController {
     private final InvoiceService invoiceService;
 
     @GetMapping
-    public List<CustomerInvoiceResponse> getAllInvoices() {
-        return invoiceService.getCustomerInvoices();
+    public List<CustomerInvoiceResponse> getAllInvoices(Authentication authentication) {
+        return invoiceService.getCustomerInvoices(authentication.getName());
     }
 
     @GetMapping("/pending")
-    public List<CustomerInvoiceResponse> getPendingInvoices() {
-        return invoiceService.getPendingInvoices();
+    public List<CustomerInvoiceResponse> getPending(Authentication authentication) {
+        return invoiceService.getPendingInvoices(authentication.getName());
     }
 
     @GetMapping("/{id}")
-    public CustomerInvoiceResponse getInvoiceById(@PathVariable Long id) {
-        return invoiceService.getInvoiceById(id);
+    public CustomerInvoiceResponse getInvoice(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return invoiceService.getInvoiceById(id, authentication.getName());
     }
 }

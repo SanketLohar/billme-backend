@@ -1,21 +1,21 @@
 package com.billme.invoice;
 
 import com.billme.customer.CustomerProfile;
+import com.billme.invoice.dto.CreateInvoiceItemRequest;
+import com.billme.invoice.CreateInvoiceRequest;
 import com.billme.merchant.MerchantProfile;
-import com.billme.repository.CustomerProfileRepository;
-import com.billme.repository.InvoiceRepository;
-import com.billme.repository.MerchantProfileRepository;
-import com.billme.repository.UserRepository;
+import com.billme.product.Product;
+import com.billme.repository.*;
 import com.billme.user.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
-import java.util.UUID;
-
+import com.billme.invoice.CustomerInvoiceResponse;
+import java.math.BigDecimal;
+import java.util.List;
+import com.billme.invoice.CustomerInvoiceResponse;
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
@@ -23,90 +23,74 @@ public class InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final MerchantProfileRepository merchantProfileRepository;
     private final CustomerProfileRepository customerProfileRepository;
+    private final ProductRepository productRepository;
     private final UserRepository userRepository;
 
     // =====================================================
-    // 1️⃣ CREATE INVOICE (MERCHANT)
+    // CREATE ITEMIZED INVOICE
     // =====================================================
-    public void createInvoice(Long merchantId,
-                              Long customerId,
-                              BigDecimal amount) {
+    @Transactional
+    public void createInvoice(CreateInvoiceRequest request, String email) {
 
-        MerchantProfile merchant =
-                merchantProfileRepository.findById(merchantId)
-                        .orElseThrow(() -> new RuntimeException("Merchant not found"));
+        User loggedInUser = getLoggedInUser();
 
-        CustomerProfile customer =
-                customerProfileRepository.findById(customerId)
-                        .orElseThrow(() -> new RuntimeException("Customer not found"));
+        MerchantProfile merchant = merchantProfileRepository
+                .findByUser_Id(loggedInUser.getId())
+                .orElseThrow(() -> new RuntimeException("Merchant profile not found"));
+
+        if (!merchant.isProfileCompleted()) {
+            throw new RuntimeException("Complete profile before creating invoice");
+        }
+
+        CustomerProfile customer = customerProfileRepository
+                .findById(request.getCustomerId())
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new RuntimeException("Invoice must contain items");
+        }
 
         Invoice invoice = new Invoice();
-
-        invoice.setInvoiceNumber(generateInvoiceNumber());
         invoice.setMerchant(merchant);
         invoice.setCustomer(customer);
-        invoice.setAmount(amount);
-        invoice.setStatus(InvoiceStatus.UNPAID);
-        invoice.setIssuedAt(LocalDateTime.now());
-        invoice.setPaymentMethod(null);
-        invoice.setPaidAt(null);
+
+        BigDecimal grandTotal = BigDecimal.ZERO;
+
+        for (CreateInvoiceItemRequest itemRequest : request.getItems()) {
+
+            if (itemRequest.getQuantity() <= 0) {
+                throw new RuntimeException("Quantity must be greater than zero");
+            }
+
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            if (!product.getMerchant().getId().equals(merchant.getId())) {
+                throw new RuntimeException("Unauthorized product access");
+            }
+
+            BigDecimal total = product.getPrice()
+                    .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+
+            InvoiceItem item = InvoiceItem.builder()
+                    .invoice(invoice)
+                    .product(product)
+                    .productNameSnapshot(product.getName())
+                    .unitPrice(product.getPrice())
+                    .quantity(itemRequest.getQuantity())
+                    .totalPrice(total)
+                    .build();
+
+            invoice.getItems().add(item);
+            grandTotal = grandTotal.add(total);
+        }
+
+        invoice.setAmount(grandTotal);
 
         invoiceRepository.save(invoice);
     }
 
     // =====================================================
-    // 2️⃣ GET ALL INVOICES (CUSTOMER)
-    // =====================================================
-    public List<CustomerInvoiceResponse> getCustomerInvoices() {
-
-        User user = getLoggedInUser();
-
-        return invoiceRepository
-                .findByCustomer_User_Id(user.getId())
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
-
-    // =====================================================
-    // 3️⃣ GET ONLY UNPAID INVOICES
-    // =====================================================
-    public List<CustomerInvoiceResponse> getPendingInvoices() {
-
-        User user = getLoggedInUser();
-
-        return invoiceRepository
-                .findByCustomer_User_IdAndStatus(
-                        user.getId(),
-                        InvoiceStatus.UNPAID
-                )
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
-
-    // =====================================================
-    // 4️⃣ GET SINGLE INVOICE (OWNERSHIP CHECK)
-    // =====================================================
-    public CustomerInvoiceResponse getInvoiceById(Long invoiceId) {
-
-        User user = getLoggedInUser();
-
-        Invoice invoice = invoiceRepository
-                .findByIdAndCustomer_User_Id(invoiceId, user.getId())
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
-
-        return mapToResponse(invoice);
-    }
-
-    // =====================================================
-    // 🔒 HELPER METHODS
-    // =====================================================
-
-    private String generateInvoiceNumber() {
-        return "INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-    }
-
     private User getLoggedInUser() {
 
         String email = SecurityContextHolder
@@ -117,17 +101,14 @@ public class InvoiceService {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
+    public List<CustomerInvoiceResponse> getCustomerInvoices(String email) {
+        throw new UnsupportedOperationException("Invoice Phase not finalized yet");
+    }
 
-    private CustomerInvoiceResponse mapToResponse(Invoice invoice) {
-
-        return CustomerInvoiceResponse.builder()
-                .id(invoice.getId())
-                .invoiceNumber(invoice.getInvoiceNumber())
-                .merchantName(invoice.getMerchant().getBusinessName())
-                .amount(invoice.getAmount())
-                .status(invoice.getStatus())
-                .issuedAt(invoice.getIssuedAt())
-                .paidAt(invoice.getPaidAt())
-                .build();
+    public List<CustomerInvoiceResponse> getPendingInvoices(String email) {
+        throw new UnsupportedOperationException("Invoice Phase not finalized yet");
+    }
+    public CustomerInvoiceResponse getInvoiceById(Long id, String email) {
+        throw new UnsupportedOperationException("Invoice Phase not finalized yet");
     }
 }

@@ -8,6 +8,8 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -22,13 +24,14 @@ public class Invoice {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true, nullable = false)
     private String invoiceNumber;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "merchant_id", nullable = false)
     private MerchantProfile merchant;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false)
     private CustomerProfile customer;
 
@@ -36,17 +39,22 @@ public class Invoice {
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private InvoiceStatus status;
 
     @Enumerated(EnumType.STRING)
     private PaymentMethod paymentMethod;
+
+    @OneToMany(mappedBy = "invoice",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true)
+    private List<InvoiceItem> items = new ArrayList<>();
 
     @OneToOne
     @JoinColumn(name = "transaction_id")
     private Transaction transaction;
 
     private LocalDateTime issuedAt;
-
     private LocalDateTime paidAt;
 
     @PrePersist
