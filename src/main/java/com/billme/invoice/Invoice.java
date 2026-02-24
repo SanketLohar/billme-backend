@@ -57,6 +57,10 @@ public class Invoice {
     private LocalDateTime issuedAt;
     private LocalDateTime paidAt;
 
+    @Column
+    private String razorpayOrderId;
+
+
     @PrePersist
     public void prePersist() {
         this.issuedAt = LocalDateTime.now();

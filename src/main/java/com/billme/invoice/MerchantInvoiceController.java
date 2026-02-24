@@ -15,11 +15,9 @@ public class MerchantInvoiceController {
 
     @PostMapping
     public ResponseEntity<String> createInvoice(
-            @RequestBody CreateInvoiceRequest request,
-            Authentication authentication
-    ) {
+            @RequestBody CreateInvoiceRequest request) {
 
-        invoiceService.createInvoice(request, authentication.getName());
+        invoiceService.createInvoice(request);
 
         return ResponseEntity.ok("Invoice created successfully");
     }

@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/merchant/**").hasAuthority("ROLE_MERCHANT")
                         .requestMatchers("/customer/**").hasAuthority("ROLE_CUSTOMER")
+                        .requestMatchers("/api/webhooks/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

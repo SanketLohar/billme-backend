@@ -9,18 +9,15 @@ import java.util.Optional;
 
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
-    // 🔹 Fetch all invoices of a customer
+    // Customer invoice fetch
     List<Invoice> findByCustomer_User_Id(Long userId);
 
-    // 🔹 Fetch by customer + status (useful for filters)
     List<Invoice> findByCustomer_User_IdAndStatus(Long userId, InvoiceStatus status);
 
-    // 🔐 Secure ownership validation (used in payment flow)
     Optional<Invoice> findByIdAndCustomer_User_Id(Long invoiceId, Long userId);
-
-    // 🔐 Merchant-side invoice fetch (future use)
+    Optional<Invoice> findByRazorpayOrderId(String razorpayOrderId);
+    // Merchant invoice fetch
     List<Invoice> findByMerchant_User_Id(Long userId);
 
-    // 🔐 Merchant invoice ownership validation (future use)
     Optional<Invoice> findByIdAndMerchant_User_Id(Long invoiceId, Long userId);
 }

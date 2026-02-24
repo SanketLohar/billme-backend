@@ -1,20 +1,22 @@
-package com.billme.invoice;
+package com.billme.invoice.dto;
 
 import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
 public class CustomerInvoiceResponse {
 
-    private Long id;
+    private Long invoiceId;
     private String invoiceNumber;
-    private String merchantName;
     private BigDecimal amount;
-    private InvoiceStatus status;
+    private String status;
+    private String paymentMethod;
     private LocalDateTime issuedAt;
     private LocalDateTime paidAt;
+    private List<InvoiceItemResponse> items;
 }

@@ -22,7 +22,7 @@ public class Transaction {
 
     // Sender Wallet
     @ManyToOne
-    @JoinColumn(name = "sender_wallet_id", nullable = false)
+    @JoinColumn(name = "sender_wallet_id")
     private Wallet senderWallet;
 
     // Receiver Wallet (nullable for UPI external)

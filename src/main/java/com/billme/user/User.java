@@ -1,5 +1,6 @@
 package com.billme.user;
 
+import com.billme.wallet.Wallet;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -17,6 +18,9 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @OneToOne
+    private Wallet wallet;
 
     @Column(unique = true, nullable = false)
     private String email;
