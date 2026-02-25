@@ -67,4 +67,13 @@ public class Invoice {
         this.status = InvoiceStatus.UNPAID;
         this.invoiceNumber = "INV-" + System.currentTimeMillis();
     }
+
+    @Column(nullable = false)
+    private BigDecimal subtotal;
+
+    @Column(nullable = false)
+    private BigDecimal processingFee;
+
+    @Column(nullable = false)
+    private BigDecimal totalPayable;
 }

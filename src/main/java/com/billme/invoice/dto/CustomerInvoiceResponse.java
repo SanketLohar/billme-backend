@@ -19,4 +19,7 @@ public class CustomerInvoiceResponse {
     private LocalDateTime issuedAt;
     private LocalDateTime paidAt;
     private List<InvoiceItemResponse> items;
+    private BigDecimal subtotal;
+    private BigDecimal processingFee;
+    private BigDecimal totalPayable;
 }

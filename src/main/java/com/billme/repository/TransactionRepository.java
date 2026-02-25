@@ -8,9 +8,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
+import com.billme.wallet.Wallet;
+import com.billme.transaction.TransactionType;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
+import java.util.List;
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
     @Query("""
@@ -31,5 +35,32 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("fromDate") LocalDateTime fromDate,
             @Param("toDate") LocalDateTime toDate,
             Pageable pageable
+    );
+
+    List<Transaction> findBySenderWalletAndTransactionTypeOrderByCreatedAtDesc(
+            Wallet wallet,
+            TransactionType type
+    );
+
+    @Query("""
+        SELECT COALESCE(SUM(t.amount), 0)
+        FROM Transaction t
+        WHERE t.receiverWallet = :wallet
+        AND t.transactionType = :type
+       """)
+    BigDecimal getTotalReceived(
+            @Param("wallet") Wallet wallet,
+            @Param("type") TransactionType type
+    );
+
+    @Query("""
+        SELECT COALESCE(SUM(t.amount), 0)
+        FROM Transaction t
+        WHERE t.senderWallet = :wallet
+        AND t.transactionType = :type
+       """)
+    BigDecimal getTotalWithdrawn(
+            @Param("wallet") Wallet wallet,
+            @Param("type") TransactionType type
     );
 }

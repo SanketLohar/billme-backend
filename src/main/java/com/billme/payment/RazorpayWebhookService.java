@@ -94,7 +94,7 @@ public class RazorpayWebhookService {
         // 💰 Call Settlement Layer
         settlementService.settlePayment(
                 invoice,
-                transaction.getAmount(),
+                invoice.getSubtotal(),
                 paymentId
         );
 

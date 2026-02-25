@@ -5,5 +5,6 @@ public enum TransactionType {
     UPI_PAY,
     WALLET_TOPUP,
     REFUND,
-    INVOICE_PAYMENT
+    INVOICE_PAYMENT,
+    WITHDRAWAL
 }

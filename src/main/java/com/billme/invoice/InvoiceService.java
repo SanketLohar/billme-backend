@@ -13,6 +13,7 @@ import com.billme.transaction.TransactionStatus;
 import com.billme.transaction.TransactionType;
 import com.billme.user.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,9 @@ public class InvoiceService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final RazorpayService razorpayService;
+
+    @Value("${processing.fee.percent}")
+    private BigDecimal processingFeePercent;
     // =====================================================
     // CREATE INVOICE (STRICT PHASE 6 VERSION)
     // =====================================================
@@ -62,7 +66,7 @@ public class InvoiceService {
         invoice.setMerchant(merchant);
         invoice.setCustomer(customer);
 
-        BigDecimal grandTotal = BigDecimal.ZERO;
+        BigDecimal subtotal = BigDecimal.ZERO;
 
         for (CreateInvoiceItemRequest itemRequest : request.getItems()) {
 
@@ -89,10 +93,25 @@ public class InvoiceService {
                     .build();
 
             invoice.getItems().add(item);
-            grandTotal = grandTotal.add(total);
+            subtotal = subtotal.add(total);
         }
 
-        invoice.setAmount(grandTotal);
+        // ================================
+        // 💰 PROCESSING FEE CALCULATION
+        // ================================
+
+        BigDecimal processingFee = subtotal
+                .multiply(processingFeePercent)
+                .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+
+        BigDecimal totalPayable = subtotal.add(processingFee);
+
+        invoice.setSubtotal(subtotal);
+        invoice.setProcessingFee(processingFee);
+        invoice.setTotalPayable(totalPayable);
+
+        // amount = merchant earning base
+        invoice.setAmount(subtotal);
 
         invoiceRepository.save(invoice);
     }
@@ -219,7 +238,10 @@ public class InvoiceService {
         return CustomerInvoiceResponse.builder()
                 .invoiceId(invoice.getId())
                 .invoiceNumber(invoice.getInvoiceNumber())
-                .amount(invoice.getAmount())
+                .amount(invoice.getTotalPayable()) // 👈 updated
+                .subtotal(invoice.getSubtotal())   // 👈 new
+                .processingFee(invoice.getProcessingFee()) // 👈 new
+                .totalPayable(invoice.getTotalPayable()) // 👈 new
                 .status(invoice.getStatus().name())
                 .paymentMethod(invoice.getPaymentMethod() != null
                         ? invoice.getPaymentMethod().name()
@@ -239,7 +261,6 @@ public class InvoiceService {
                 )
                 .build();
     }
-
     // =====================================================
     private User getLoggedInUser() {
         String email = SecurityContextHolder

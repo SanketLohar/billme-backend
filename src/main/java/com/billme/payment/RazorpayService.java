@@ -44,7 +44,7 @@ public class RazorpayService {
             JSONObject options = new JSONObject();
 
             // Convert ₹ to paise
-            int amountInPaise = invoice.getAmount()
+            int amountInPaise = invoice.getTotalPayable()
                     .multiply(BigDecimal.valueOf(100))
                     .intValue();
 
