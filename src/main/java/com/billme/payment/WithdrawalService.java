@@ -11,11 +11,13 @@ import com.billme.wallet.Wallet;
 import com.billme.wallet.WalletService;
 import com.billme.wallet.dto.WalletSummaryResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -26,8 +28,14 @@ public class WithdrawalService {
     private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
 
+    @Value("${platform.withdrawal.fee-percent}")
+    private BigDecimal withdrawalFeePercent;
+
     private static final BigDecimal MIN_WITHDRAWAL = BigDecimal.valueOf(100);
 
+    // ============================================
+    // WITHDRAW WITH PLATFORM FEE
+    // ============================================
     @Transactional
     public void withdraw(BigDecimal amount) {
 
@@ -40,47 +48,58 @@ public class WithdrawalService {
         }
 
         User user = getLoggedInUser();
-
         Wallet merchantWallet = walletService.getWalletByUser(user);
 
         if (merchantWallet.getBalance().compareTo(amount) < 0) {
             throw new RuntimeException("Insufficient wallet balance");
         }
 
-        // 💸 Debit wallet
+        // 🔥 Calculate platform fee
+        BigDecimal fee = amount
+                .multiply(withdrawalFeePercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        BigDecimal netPayout = amount.subtract(fee);
+
+        // 💸 Debit full amount from wallet
         walletService.debit(merchantWallet, amount);
 
-        // 🧾 Create ledger transaction
-        Transaction transaction = Transaction.builder()
+        // 🧾 Ledger Entry 1: Withdrawal (gross amount)
+        Transaction withdrawalTx = Transaction.builder()
                 .senderWallet(merchantWallet)
-                .receiverWallet(null) // External bank (simulated)
+                .receiverWallet(null) // External bank
                 .amount(amount)
                 .transactionType(TransactionType.WITHDRAWAL)
                 .status(TransactionStatus.SUCCESS)
                 .externalReference("SIMULATED-PAYOUT")
                 .build();
 
-        transactionRepository.save(transaction);
+        transactionRepository.save(withdrawalTx);
 
-        System.out.println("🏦 Simulated payout processed for amount: " + amount);
+        // 🧾 Ledger Entry 2: Platform Fee
+        Transaction feeTx = Transaction.builder()
+                .senderWallet(merchantWallet)
+                .receiverWallet(null) // Fee retained in platform Razorpay balance
+                .amount(fee)
+                .transactionType(TransactionType.PLATFORM_FEE)
+                .status(TransactionStatus.SUCCESS)
+                .externalReference("PLATFORM-FEE")
+                .build();
+
+        transactionRepository.save(feeTx);
+
+        // 🏦 Simulated payout log
+        System.out.println("🏦 Simulated payout to merchant bank: ₹" + netPayout);
+        System.out.println("💼 Platform fee retained: ₹" + fee);
     }
 
-    private User getLoggedInUser() {
-
-        String email = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
-
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-    }
-
+    // ============================================
+    // WITHDRAWAL HISTORY
+    // ============================================
     @Transactional(readOnly = true)
     public List<WithdrawalResponse> getWithdrawalHistory() {
 
         User user = getLoggedInUser();
-
         Wallet wallet = walletService.getWalletByUser(user);
 
         return transactionRepository
@@ -98,11 +117,14 @@ public class WithdrawalService {
                 )
                 .toList();
     }
+
+    // ============================================
+    // WALLET SUMMARY
+    // ============================================
     @Transactional(readOnly = true)
     public WalletSummaryResponse getWalletSummary() {
 
         User user = getLoggedInUser();
-
         Wallet wallet = walletService.getWalletByUser(user);
 
         BigDecimal totalReceived = transactionRepository.getTotalReceived(
@@ -115,11 +137,30 @@ public class WithdrawalService {
                 TransactionType.WITHDRAWAL
         );
 
+        BigDecimal totalPlatformFee = transactionRepository.getTotalWithdrawn(
+                wallet,
+                TransactionType.PLATFORM_FEE
+        );
+
         return WalletSummaryResponse.builder()
                 .currentBalance(wallet.getBalance())
                 .totalReceived(totalReceived)
                 .totalWithdrawn(totalWithdrawn)
+                .platformFee(totalPlatformFee)   // 🔥 make sure DTO updated
                 .build();
     }
 
+    // ============================================
+    // AUTH HELPER
+    // ============================================
+    private User getLoggedInUser() {
+
+        String email = SecurityContextHolder
+                .getContext()
+                .getAuthentication()
+                .getName();
+
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
 }

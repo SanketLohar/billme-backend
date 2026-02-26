@@ -6,5 +6,6 @@ public enum TransactionType {
     WALLET_TOPUP,
     REFUND,
     INVOICE_PAYMENT,
-    WITHDRAWAL
+    WITHDRAWAL,
+    PLATFORM_FEE
 }

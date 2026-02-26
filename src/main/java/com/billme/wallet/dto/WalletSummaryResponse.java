@@ -12,4 +12,6 @@ public class WalletSummaryResponse {
     private BigDecimal currentBalance;
     private BigDecimal totalReceived;
     private BigDecimal totalWithdrawn;
+    private BigDecimal platformFee;
+
 }
