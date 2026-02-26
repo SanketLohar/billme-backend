@@ -7,5 +7,6 @@ public enum TransactionType {
     REFUND,
     INVOICE_PAYMENT,
     WITHDRAWAL,
-    PLATFORM_FEE
+    PLATFORM_FEE,
+
 }

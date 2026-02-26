@@ -76,4 +76,8 @@ public class Invoice {
 
     @Column(nullable = false)
     private BigDecimal totalPayable;
+
+    @Column(name = "refund_window_expiry")
+    private LocalDateTime refundWindowExpiry;
+
 }

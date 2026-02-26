@@ -63,5 +63,24 @@ public class RazorpayService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to create Razorpay order: " + e.getMessage());
         }
+
+
+    }
+    public void refundPayment(String paymentId, BigDecimal amount) {
+
+        try {
+
+            RazorpayClient razorpayClient =
+                    new RazorpayClient(keyId, keySecret);
+
+            JSONObject refundRequest = new JSONObject();
+            refundRequest.put("amount",
+                    amount.multiply(BigDecimal.valueOf(100)).intValue());
+
+            razorpayClient.payments.refund(paymentId, refundRequest);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Refund failed: " + e.getMessage());
+        }
     }
 }

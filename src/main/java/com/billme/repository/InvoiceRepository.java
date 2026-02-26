@@ -20,4 +20,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     List<Invoice> findByMerchant_User_Id(Long userId);
 
     Optional<Invoice> findByIdAndMerchant_User_Id(Long invoiceId, Long userId);
+
+    List<Invoice> findByMerchant_User_IdAndStatus(
+            Long userId,
+            InvoiceStatus status
+    );
 }

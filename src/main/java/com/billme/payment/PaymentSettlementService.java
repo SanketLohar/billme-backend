@@ -2,6 +2,7 @@ package com.billme.payment;
 
 import com.billme.invoice.Invoice;
 import com.billme.invoice.InvoiceStatus;
+import com.billme.invoice.PaymentMethod;
 import com.billme.repository.TransactionRepository;
 import com.billme.transaction.Transaction;
 import com.billme.transaction.TransactionStatus;
@@ -11,16 +12,16 @@ import com.billme.wallet.WalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.time.LocalDateTime;
 import java.math.BigDecimal;
-
+import com.billme.repository.InvoiceRepository;
 @Service
 @RequiredArgsConstructor
 public class PaymentSettlementService {
 
     private final WalletService walletService;
     private final TransactionRepository transactionRepository;
-
+    private final InvoiceRepository invoiceRepository;
     @Transactional
     public void settlePayment(Invoice invoice,
                               BigDecimal amount,
@@ -56,7 +57,10 @@ public class PaymentSettlementService {
         // 4️⃣ Mark invoice PAID (ONLY here)
         invoice.setStatus(InvoiceStatus.PAID);
         invoice.setTransaction(ledgerTransaction);
-
-        System.out.println("💰 Merchant wallet credited & invoice settled");
+        invoice.setPaymentMethod(PaymentMethod.UPI_PAY);
+        invoice.setPaymentMethod(PaymentMethod.FACE_PAY);
+        invoice.setRefundWindowExpiry(LocalDateTime.now().plusDays(3));
+        invoiceRepository.save(invoice);
+        System.out.println("Merchant wallet credited & invoice settled");
     }
 }

@@ -1,5 +1,7 @@
 package com.billme.payment;
 
+import com.billme.invoice.Invoice;
+import com.billme.repository.InvoiceRepository;
 import com.billme.payment.dto.WithdrawalResponse;
 import com.billme.repository.TransactionRepository;
 import com.billme.repository.UserRepository;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -27,6 +30,7 @@ public class WithdrawalService {
     private final WalletService walletService;
     private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
+    private final InvoiceRepository invoiceRepository;   // ✅ Added
 
     @Value("${platform.withdrawal.fee-percent}")
     private BigDecimal withdrawalFeePercent;
@@ -34,7 +38,7 @@ public class WithdrawalService {
     private static final BigDecimal MIN_WITHDRAWAL = BigDecimal.valueOf(100);
 
     // ============================================
-    // WITHDRAW WITH PLATFORM FEE
+    // WITHDRAW WITH PLATFORM FEE + REFUND LOCK
     // ============================================
     @Transactional
     public void withdraw(BigDecimal amount) {
@@ -50,8 +54,26 @@ public class WithdrawalService {
         User user = getLoggedInUser();
         Wallet merchantWallet = walletService.getWalletByUser(user);
 
-        if (merchantWallet.getBalance().compareTo(amount) < 0) {
-            throw new RuntimeException("Insufficient wallet balance");
+        // 🔒 Calculate locked amount (refund window active)
+        BigDecimal lockedAmount = invoiceRepository
+                .findByMerchant_User_IdAndStatus(
+                        user.getId(),
+                        com.billme.invoice.InvoiceStatus.PAID
+                )
+                .stream()
+                .filter(inv -> inv.getRefundWindowExpiry() != null
+                        && inv.getRefundWindowExpiry().isAfter(LocalDateTime.now()))
+                .map(Invoice::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal withdrawableBalance =
+                merchantWallet.getBalance().subtract(lockedAmount);
+
+        if (withdrawableBalance.compareTo(amount) < 0) {
+            throw new RuntimeException(
+                    "Amount locked under refund window. Withdrawable balance: ₹"
+                            + withdrawableBalance
+            );
         }
 
         // 🔥 Calculate platform fee
@@ -61,13 +83,13 @@ public class WithdrawalService {
 
         BigDecimal netPayout = amount.subtract(fee);
 
-        // 💸 Debit full amount from wallet
+        // 💸 Debit full amount
         walletService.debit(merchantWallet, amount);
 
-        // 🧾 Ledger Entry 1: Withdrawal (gross amount)
+        // 🧾 Withdrawal ledger
         Transaction withdrawalTx = Transaction.builder()
                 .senderWallet(merchantWallet)
-                .receiverWallet(null) // External bank
+                .receiverWallet(null)
                 .amount(amount)
                 .transactionType(TransactionType.WITHDRAWAL)
                 .status(TransactionStatus.SUCCESS)
@@ -76,10 +98,10 @@ public class WithdrawalService {
 
         transactionRepository.save(withdrawalTx);
 
-        // 🧾 Ledger Entry 2: Platform Fee
+        // 🧾 Platform fee ledger
         Transaction feeTx = Transaction.builder()
                 .senderWallet(merchantWallet)
-                .receiverWallet(null) // Fee retained in platform Razorpay balance
+                .receiverWallet(null)
                 .amount(fee)
                 .transactionType(TransactionType.PLATFORM_FEE)
                 .status(TransactionStatus.SUCCESS)
@@ -88,9 +110,8 @@ public class WithdrawalService {
 
         transactionRepository.save(feeTx);
 
-        // 🏦 Simulated payout log
-        System.out.println("🏦 Simulated payout to merchant bank: ₹" + netPayout);
-        System.out.println("💼 Platform fee retained: ₹" + fee);
+        System.out.println("Simulated payout to merchant bank: ₹" + netPayout);
+        System.out.println("Platform fee retained: ₹" + fee);
     }
 
     // ============================================
@@ -146,13 +167,10 @@ public class WithdrawalService {
                 .currentBalance(wallet.getBalance())
                 .totalReceived(totalReceived)
                 .totalWithdrawn(totalWithdrawn)
-                .platformFee(totalPlatformFee)   // 🔥 make sure DTO updated
+                .platformFee(totalPlatformFee)
                 .build();
     }
 
-    // ============================================
-    // AUTH HELPER
-    // ============================================
     private User getLoggedInUser() {
 
         String email = SecurityContextHolder
