@@ -4,11 +4,7 @@ import com.billme.customer.CustomerProfile;
 import com.billme.invoice.Invoice;
 import com.billme.invoice.InvoiceStatus;
 import com.billme.invoice.PaymentMethod;
-import com.billme.repository.CustomerProfileRepository;
-import com.billme.repository.InvoiceRepository;
-import com.billme.repository.TransactionRepository;
-import com.billme.repository.UserRepository;
-import com.billme.repository.WalletRepository;
+import com.billme.repository.*;
 import com.billme.security.face.FaceRecognitionUtil;
 import com.billme.transaction.Transaction;
 import com.billme.transaction.TransactionStatus;
@@ -47,14 +43,10 @@ public class FacePayService {
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
         if (invoice.getStatus() == InvoiceStatus.PAID) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Invoice already paid"
-            );
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Invoice already paid");
         }
 
-
-        // 🔐 REAL FACE MATCH
+        // 🔐 Face verification
         CustomerProfile profile = customerProfileRepository
                 .findByUser_Id(customer.getId())
                 .orElseThrow(() -> new RuntimeException("Customer profile not found"));
@@ -66,12 +58,8 @@ public class FacePayService {
         );
 
         if (!match) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Face verification failed"
-            );
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Face verification failed");
         }
-
 
         Wallet customerWallet = walletRepository
                 .findByUser(customer)
@@ -84,21 +72,17 @@ public class FacePayService {
         BigDecimal amount = invoice.getAmount();
 
         if (customerWallet.getBalance().compareTo(amount) < 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Insufficient wallet balance"
-            );
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance");
         }
 
-
-        // 💰 Atomic Transfer
+        // 💰 Transfer
         customerWallet.setBalance(customerWallet.getBalance().subtract(amount));
         merchantWallet.setBalance(merchantWallet.getBalance().add(amount));
 
         walletRepository.save(customerWallet);
         walletRepository.save(merchantWallet);
 
-        // 🧾 Create transaction
+        // 🧾 Ledger entry
         Transaction transaction = Transaction.builder()
                 .senderWallet(customerWallet)
                 .receiverWallet(merchantWallet)
@@ -110,11 +94,12 @@ public class FacePayService {
 
         transactionRepository.save(transaction);
 
-        // 🧾 Update invoice
-        invoice.setStatus(InvoiceStatus.PAID);
+        // 🧾 Invoice update
         invoice.setPaymentMethod(PaymentMethod.FACE_PAY);
+        invoice.setStatus(InvoiceStatus.PAID);
         invoice.setPaidAt(LocalDateTime.now());
         invoice.setTransaction(transaction);
+        invoice.setRefundWindowExpiry(LocalDateTime.now().plusDays(3));
 
         invoiceRepository.save(invoice);
 
@@ -122,12 +107,7 @@ public class FacePayService {
     }
 
     private User getLoggedInUser() {
-
-        String email = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
-
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }

@@ -1,5 +1,6 @@
 package com.billme.transaction;
 
+import com.billme.invoice.Invoice;
 import com.billme.wallet.Wallet;
 import jakarta.persistence.*;
 import lombok.*;
@@ -38,6 +39,10 @@ public class Transaction {
 
     @Enumerated(EnumType.STRING)
     private TransactionStatus status;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "invoice_id")   // ✅ NEW
+    private Invoice invoice;
 
     private String externalReference; // for UPI txn id
 

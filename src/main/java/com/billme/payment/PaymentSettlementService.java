@@ -27,24 +27,17 @@ public class PaymentSettlementService {
                               BigDecimal amount,
                               String paymentId) {
 
-        // 🔒 Idempotency Guard
         if (invoice.getStatus() == InvoiceStatus.PAID) {
-            System.out.println("Settlement skipped - invoice already PAID");
             return;
         }
 
-        // 1️⃣ Get merchant wallet
         Wallet merchantWallet =
-                walletService.getWalletByUser(
-                        invoice.getMerchant().getUser()
-                );
+                walletService.getWalletByUser(invoice.getMerchant().getUser());
 
-        // 2️⃣ Credit merchant wallet
         walletService.credit(merchantWallet, amount);
 
-        // 3️⃣ Create ledger transaction
         Transaction ledgerTransaction = Transaction.builder()
-                .senderWallet(null) // External source (Razorpay)
+                .senderWallet(null)
                 .receiverWallet(merchantWallet)
                 .amount(amount)
                 .transactionType(TransactionType.INVOICE_PAYMENT)
@@ -54,13 +47,11 @@ public class PaymentSettlementService {
 
         transactionRepository.save(ledgerTransaction);
 
-        // 4️⃣ Mark invoice PAID (ONLY here)
         invoice.setStatus(InvoiceStatus.PAID);
         invoice.setTransaction(ledgerTransaction);
-        invoice.setPaymentMethod(PaymentMethod.UPI_PAY);
-        invoice.setPaymentMethod(PaymentMethod.FACE_PAY);
+        invoice.setPaidAt(LocalDateTime.now());
         invoice.setRefundWindowExpiry(LocalDateTime.now().plusDays(3));
+
         invoiceRepository.save(invoice);
-        System.out.println("Merchant wallet credited & invoice settled");
     }
 }

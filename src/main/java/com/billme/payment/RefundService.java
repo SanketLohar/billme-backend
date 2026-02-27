@@ -3,11 +3,14 @@ package com.billme.payment;
 import com.billme.invoice.Invoice;
 import com.billme.invoice.InvoiceStatus;
 import com.billme.invoice.PaymentMethod;
+import com.billme.payment.dto.MerchantRefundResponse;
 import com.billme.repository.InvoiceRepository;
 import com.billme.repository.TransactionRepository;
 import com.billme.transaction.Transaction;
 import com.billme.transaction.TransactionStatus;
 import com.billme.transaction.TransactionType;
+import com.billme.user.Role;
+import com.billme.user.User;
 import com.billme.wallet.Wallet;
 import com.billme.wallet.WalletService;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
+import java.util.List;
+import com.billme.repository.UserRepository;
+import com.billme.repository.WalletRepository;
 @Service
 @RequiredArgsConstructor
 public class RefundService {
@@ -25,7 +30,8 @@ public class RefundService {
     private final WalletService walletService;
     private final TransactionRepository transactionRepository;
     private final RazorpayService razorpayService;
-
+    private final UserRepository userRepository;
+    private final WalletRepository walletRepository;
     @Transactional
     public void refundInvoice(Long invoiceId) {
 
@@ -48,6 +54,7 @@ public class RefundService {
         Wallet merchantWallet = walletService.getWalletByUser(
                 invoice.getMerchant().getUser()
         );
+
 
         // 🔥 CASE 1 — Razorpay Payment
         if (invoice.getPaymentMethod() == PaymentMethod.UPI_PAY) {
@@ -82,6 +89,7 @@ public class RefundService {
         Transaction refundTx = Transaction.builder()
                 .senderWallet(merchantWallet)
                 .receiverWallet(null)
+                .invoice(invoice)   // ✅ ADD THIS
                 .amount(amount)
                 .transactionType(TransactionType.REFUND)
                 .status(TransactionStatus.SUCCESS)
@@ -94,6 +102,21 @@ public class RefundService {
         invoice.setStatus(InvoiceStatus.REFUNDED);
         invoiceRepository.save(invoice);
 
-        System.out.println("💸 Refund processed for invoice: " + invoiceId);
+        System.out.println("Refund processed for invoice: " + invoiceId);
     }
+    @Transactional(readOnly = true)
+    public List<MerchantRefundResponse> getMerchantRefundHistory(String merchantEmail) {
+
+        User user = userRepository.findByEmail(merchantEmail)
+                .orElseThrow(() -> new RuntimeException("Merchant not found"));
+
+        if (user.getRole() != Role.MERCHANT) {
+            throw new RuntimeException("Access denied");
+        }
+
+        Wallet wallet = walletService.getWalletByUser(user);
+
+        return transactionRepository.findMerchantRefundHistory(wallet.getId());
+    }
+
 }

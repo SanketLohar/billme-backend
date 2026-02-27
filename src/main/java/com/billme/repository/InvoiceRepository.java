@@ -3,7 +3,9 @@ package com.billme.repository;
 import com.billme.invoice.Invoice;
 import com.billme.invoice.InvoiceStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,4 +27,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
             Long userId,
             InvoiceStatus status
     );
+    @Query("""
+       SELECT COALESCE(SUM(i.amount), 0)
+       FROM Invoice i
+       WHERE i.status = com.billme.invoice.InvoiceStatus.PAID
+       AND i.refundWindowExpiry > CURRENT_TIMESTAMP
+       """)
+    BigDecimal sumLockedAmount();
 }
