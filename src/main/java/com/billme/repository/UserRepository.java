@@ -1,5 +1,6 @@
 package com.billme.repository;
 
+import com.billme.user.Role;
 import com.billme.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -10,5 +11,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);   // ✅ ADD THIS
-
+    boolean existsByRole(Role role);
 }

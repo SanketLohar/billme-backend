@@ -18,16 +18,29 @@ public class JwtService {
 
     private final Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
 
-    private static final long ACCESS_TOKEN_EXPIRATION = 1000 * 60 * 60; // 1 hour
+    // Token durations
+    private static final long ADMIN_EXPIRATION = 1000 * 60 * 15;  // 15 minutes
+    private static final long USER_EXPIRATION  = 1000 * 60 * 60;  // 1 hour
 
     // ✅ Generate Access Token
     public String generateAccessToken(String username, String role) {
 
+        long expirationTime;
+
+        if ("ADMIN".equals(role)) {
+            expirationTime = ADMIN_EXPIRATION;
+        } else {
+            expirationTime = USER_EXPIRATION;
+        }
+
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + expirationTime);
+
         return Jwts.builder()
                 .setSubject(username)
                 .claim("role", role)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
