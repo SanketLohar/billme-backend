@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -138,21 +139,63 @@ public class AuthService {
     }
 
     // ================= LOGIN =================
-    @Transactional
-    public AuthResponse login(LoginRequest request) {
+//    @Transactional
 
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
+
+    public AuthResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "User not found"
                 ));
+
+        // 🔒 Only protect ADMIN
+        if (user.getRole() == Role.ADMIN) {
+
+            // Check if locked
+            if (user.getLockUntil() != null &&
+                    user.getLockUntil().isAfter(LocalDateTime.now())) {
+
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "Account locked. Try again later."
+                );
+            }
+        }
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
+
+            // ✅ If success → reset counters
+            user.setFailedAttempts(0);
+            user.setLockUntil(null);
+            userRepository.save(user);
+
+        } catch (Exception ex) {
+
+            if (user.getRole() == Role.ADMIN) {
+
+                int attempts = user.getFailedAttempts() + 1;
+                user.setFailedAttempts(attempts);
+
+                if (attempts >= 5) {
+                    user.setLockUntil(LocalDateTime.now().plusMinutes(15));
+                }
+
+                userRepository.save(user);
+            }
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Bad credentials"
+            );
+        }
 
         String accessToken = jwtService.generateAccessToken(
                 user.getEmail(),

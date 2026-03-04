@@ -41,4 +41,9 @@ public class User {
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
     }
+
+    @Column(nullable = false)
+    private int failedAttempts = 0;
+
+    private LocalDateTime lockUntil;
 }

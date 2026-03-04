@@ -25,6 +25,9 @@ public class CustomerProfile {
 
     private String name;
 
+    private String address;
+
+
     @Lob
     @Column(columnDefinition = "LONGTEXT", nullable = false)
     private String faceEmbeddings;

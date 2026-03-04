@@ -25,18 +25,20 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
+    // price WITHOUT GST
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal price;
+
+    // GST percentage
+    @Column(nullable = false)
+    private BigDecimal gstRate = BigDecimal.ZERO;
 
     private String barcode;
 
     @Column(nullable = false)
     private boolean active = true;
 
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @PrePersist
@@ -49,7 +51,6 @@ public class Product {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Getters & Setters
     public Long getId() { return id; }
 
     public MerchantProfile getMerchant() { return merchant; }
@@ -60,6 +61,9 @@ public class Product {
 
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
+
+    public BigDecimal getGstRate() { return gstRate; }
+    public void setGstRate(BigDecimal gstRate) { this.gstRate = gstRate; }
 
     public String getBarcode() { return barcode; }
     public void setBarcode(String barcode) { this.barcode = barcode; }

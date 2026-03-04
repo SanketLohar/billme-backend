@@ -1,6 +1,7 @@
 package com.billme.invoice;
 
 import com.billme.customer.CustomerProfile;
+import com.billme.email.InvoiceEmailService;
 import com.billme.invoice.dto.CreateInvoiceItemRequest;
 import com.billme.invoice.dto.CustomerInvoiceResponse;
 import com.billme.invoice.dto.InvoiceItemResponse;
@@ -24,6 +25,8 @@ import com.billme.transaction.TransactionStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.math.RoundingMode;
+
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +38,8 @@ public class InvoiceService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final RazorpayService razorpayService;
+    private final InvoiceEmailService invoiceEmailService;
+
 
     @Value("${processing.fee.percent}")
     private BigDecimal processingFeePercent;
@@ -67,6 +72,7 @@ public class InvoiceService {
         invoice.setCustomer(customer);
 
         BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal gstTotal = BigDecimal.ZERO;
 
         for (CreateInvoiceItemRequest itemRequest : request.getItems()) {
 
@@ -80,8 +86,21 @@ public class InvoiceService {
                 throw new RuntimeException("Product is not active");
             }
 
-            BigDecimal total = product.getPrice()
-                    .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            BigDecimal quantity = BigDecimal.valueOf(itemRequest.getQuantity());
+
+            // base price
+            BigDecimal baseAmount = product.getPrice().multiply(quantity);
+
+            // GST calculation
+            BigDecimal gstRate = product.getGstRate() != null
+                    ? product.getGstRate()
+                    : BigDecimal.ZERO;
+
+            BigDecimal gstAmount = baseAmount
+                    .multiply(gstRate)
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+            BigDecimal lineTotal = baseAmount.add(gstAmount);
 
             InvoiceItem item = InvoiceItem.builder()
                     .invoice(invoice)
@@ -89,31 +108,39 @@ public class InvoiceService {
                     .productNameSnapshot(product.getName())
                     .unitPrice(product.getPrice())
                     .quantity(itemRequest.getQuantity())
-                    .totalPrice(total)
+                    .gstRate(gstRate)
+                    .gstAmount(gstAmount)
+                    .totalPrice(lineTotal)
                     .build();
 
             invoice.getItems().add(item);
-            subtotal = subtotal.add(total);
+
+            subtotal = subtotal.add(baseAmount);
+            gstTotal = gstTotal.add(gstAmount);
         }
 
-        // ================================
-        // 💰 PROCESSING FEE CALCULATION
-        // ================================
-
+        // Processing fee only on subtotal
         BigDecimal processingFee = subtotal
                 .multiply(processingFeePercent)
-                .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+                .divide(BigDecimal.valueOf(100), 2,RoundingMode.HALF_UP);
 
-        BigDecimal totalPayable = subtotal.add(processingFee);
+        BigDecimal totalPayable = subtotal
+                .add(gstTotal)
+                .add(processingFee);
+
+// merchant receives subtotal + gst
+        BigDecimal merchantAmount = subtotal.add(gstTotal);
 
         invoice.setSubtotal(subtotal);
         invoice.setProcessingFee(processingFee);
         invoice.setTotalPayable(totalPayable);
 
-        // amount = merchant earning base
-        invoice.setAmount(subtotal);
-
+// amount used for merchant settlement
+        invoice.setAmount(merchantAmount);
         invoiceRepository.save(invoice);
+        invoiceRepository.save(invoice);
+
+        invoiceEmailService.sendInvoiceEmail(invoice);
     }
 
     // =====================================================
@@ -255,6 +282,8 @@ public class InvoiceService {
                                                 .productName(item.getProductNameSnapshot())
                                                 .unitPrice(item.getUnitPrice())
                                                 .quantity(item.getQuantity())
+                                                .gstRate(item.getGstRate())
+                                                .gstAmount(item.getGstAmount())
                                                 .totalPrice(item.getTotalPrice())
                                                 .build()
                                 ).toList()
@@ -293,29 +322,29 @@ public class InvoiceService {
         Wallet customerWallet = customer.getUser().getWallet();
         Wallet merchantWallet = merchant.getUser().getWallet();
 
-        BigDecimal amount = invoice.getAmount();
+        BigDecimal customerPayment = invoice.getTotalPayable();
+        BigDecimal merchantAmount = invoice.getAmount();
 
-        // 🔒 Check balance
-        if (customerWallet.getBalance().compareTo(amount) < 0) {
+        if (customerWallet.getBalance().compareTo(customerPayment) < 0) {
             throw new RuntimeException("Insufficient wallet balance");
         }
 
-        // 💸 Debit customer
-        customerWallet.setBalance(customerWallet.getBalance().subtract(amount));
+        customerWallet.setBalance(
+                customerWallet.getBalance().subtract(customerPayment)
+        );
 
-        // 💰 Credit merchant
-        merchantWallet.setBalance(merchantWallet.getBalance().add(amount));
+        merchantWallet.setBalance(
+                merchantWallet.getBalance().add(merchantAmount)
+        );
 
-        // 🧾 Create transaction
         Transaction transaction = Transaction.builder()
                 .senderWallet(customerWallet)
                 .receiverWallet(merchantWallet)
-                .amount(amount)
+                .amount(customerPayment)
                 .transactionType(TransactionType.FACE_PAY)
                 .status(TransactionStatus.SUCCESS)
-                .createdAt(java.time.LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
                 .build();
-
         invoice.setTransaction(transaction);
         invoice.setPaymentMethod(PaymentMethod.FACE_PAY);
 

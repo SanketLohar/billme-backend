@@ -35,6 +35,15 @@ public class InvoiceItem {
     @Column(nullable = false)
     private Integer quantity;
 
+    // GST rate for this product
+    @Column(nullable = false)
+    private BigDecimal gstRate;
+
+    // GST amount for this line
+    @Column(nullable = false)
+    private BigDecimal gstAmount;
+
+    // total price including GST
     @Column(nullable = false)
     private BigDecimal totalPrice;
 }

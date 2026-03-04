@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+
+    <meta charset="UTF-8">
+    <title>BillMe Invoice</title>
+
+    <style>
+
+        body{
+        font-family: Arial, Helvetica, sans-serif;
+        margin:40px;
+        color:#333;
+        }
+
+        .header{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        border-bottom:2px solid #830AB1;
+        padding-bottom:10px;
+        }
+
+        .logo{
+        font-size:28px;
+        font-weight:bold;
+        color:#830AB1;
+        }
+
+        .invoice-meta{
+        text-align:right;
+        font-size:14px;
+        }
+
+        .section{
+        margin-top:25px;
+        }
+
+        .address-container{
+        display:flex;
+        justify-content:space-between;
+        }
+
+        .address-box{
+        width:45%;
+        font-size:14px;
+        line-height:20px;
+        }
+
+        table{
+        width:100%;
+        border-collapse:collapse;
+        margin-top:20px;
+        }
+
+        th, td{
+        border:1px solid #ddd;
+        padding:10px;
+        text-align:center;
+        font-size:14px;
+        }
+
+        th{
+        background:#f4f4f4;
+        }
+
+        .totals{
+        margin-top:20px;
+        width:40%;
+        float:right;
+        }
+
+        .totals table{
+        width:100%;
+        }
+
+        .pay-section{
+        clear:both;
+        margin-top:40px;
+        text-align:center;
+        }
+
+        .pay-button{
+        background:#27ae60;
+        color:white;
+        padding:14px 28px;
+        text-decoration:none;
+        border-radius:6px;
+        font-size:16px;
+        }
+
+        .footer{
+        margin-top:60px;
+        font-size:12px;
+        color:#777;
+        text-align:center;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<!-- HEADER -->
+
+<div class="header">
+
+    <div class="logo">BillMe</div>
+
+    <div class="invoice-meta">
+        <div>Invoice #: <span th:text="${invoiceNumber}"></span></div>
+        <div>Date: <span th:text="${invoiceDate}"></span></div>
+    </div>
+
+</div>
+
+<!-- BILLING SECTION -->
+
+<div class="section address-container">
+
+    <div class="address-box">
+        <strong>Bill From</strong><br>
+
+        <span th:text="${merchantName}"></span><br>
+        <span th:text="${merchantAddress}"></span><br>
+        GSTIN: <span th:text="${merchantGstin}"></span>
+
+    </div>
+
+    <div class="address-box">
+
+        <strong>Bill To</strong><br>
+
+        <span th:text="${customerName}"></span><br>
+        <span th:text="${customerEmail}"></span><br>
+        <span th:text="${customerAddress}"></span>
+
+    </div>
+
+</div>
+
+<!-- ITEMS -->
+
+<div class="section">
+
+    <table>
+
+        <thead>
+
+        <tr>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>GST %</th>
+            <th>GST Amount</th>
+            <th>Total</th>
+        </tr>
+
+        </thead>
+
+        <tbody>
+
+        <tr th:each="item : ${items}">
+
+            <td th:text="${item.productName}"></td>
+
+            <td th:text="${item.quantity}"></td>
+
+            <td th:text="${item.unitPrice}"></td>
+
+            <td th:text="${item.gstRate}"></td>
+
+            <td th:text="${item.gstAmount}"></td>
+
+            <td th:text="${item.totalPrice}"></td>
+
+        </tr>
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<!-- TOTALS -->
+
+<div class="totals">
+
+    <table>
+
+        <tr>
+            <td>Subtotal</td>
+            <td th:text="${subtotal}"></td>
+        </tr>
+
+        <tr>
+            <td>Processing Fee</td>
+            <td th:text="${processingFee}"></td>
+        </tr>
+
+        <tr>
+            <td><strong>Total Payable</strong></td>
+            <td><strong th:text="${totalPayable}"></strong></td>
+        </tr>
+
+    </table>
+
+</div>
+
+<!-- PAY BUTTON -->
+
+<div class="pay-section">
+
+    <a class="pay-button"
+       th:href="${payUrl}">
+        Pay Now
+    </a>
+
+</div>
+
+<!-- FOOTER -->
+
+<div class="footer">
+
+    <p>This invoice was generated using BillMe.</p>
+
+    <p>
+        Payments must be completed through the BillMe platform.
+    </p>
+
+</div>
+
+</body>
+</html>

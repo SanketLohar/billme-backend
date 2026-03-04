@@ -33,6 +33,12 @@ public class MerchantProfile {
 
     private LocalDateTime createdAt;
 
+    @Column
+    private String gstin;
+
+    @Column(nullable = false)
+    private boolean gstEnabled = false;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();

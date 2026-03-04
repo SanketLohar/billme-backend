@@ -10,7 +10,14 @@ import java.math.BigDecimal;
 public class InvoiceItemResponse {
 
     private String productName;
+
     private BigDecimal unitPrice;
+
     private Integer quantity;
+
+    private BigDecimal gstRate;
+
+    private BigDecimal gstAmount;
+
     private BigDecimal totalPrice;
 }
