@@ -43,6 +43,8 @@ public class SecurityConfig {
                         .requestMatchers("/customer/**").hasAuthority("ROLE_CUSTOMER")
                         .requestMatchers("/api/webhooks/**").permitAll()
                         .requestMatchers("/invoice/*/preview").permitAll()
+                        .requestMatchers("/invoice/*/pdf").permitAll()
+
 
                         .anyRequest().authenticated()
                 )

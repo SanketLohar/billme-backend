@@ -20,7 +20,7 @@ public class InvoiceEmailService {
 
         try {
 
-            byte[] pdf = pdfService.generateInvoicePdf(invoice);
+            byte[] pdf = pdfService.generatePdf(invoice);
 
             MimeMessage message = mailSender.createMimeMessage();
 
