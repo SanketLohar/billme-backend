@@ -3,22 +3,20 @@
 <head>
 
     <meta charset="UTF-8"/>
+
     <title>BillMe Invoice</title>
 
     <style>
 
         body{
-        font-family: Arial, Helvetica, sans-serif;
-        margin:40px;
+font-family: 'NotoSans', Arial, sans-serif;        margin:40px;
         color:#333;
         }
 
-        .header{
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
+        .header-table{
+        width:100%;
         border-bottom:2px solid #830AB1;
-        padding-bottom:10px;
+        margin-bottom:20px;
         }
 
         .logo{
@@ -32,19 +30,28 @@
         font-size:14px;
         }
 
-        .section{
-        margin-top:25px;
+        .status{
+        margin-top:5px;
         }
 
-        .address-container{
-        display:flex;
-        justify-content:space-between;
+        .status-badge{
+        background:#ffecec;
+        color:#d63031;
+        padding:4px 10px;
+        border-radius:4px;
+        font-size:12px;
+        }
+
+        .billing-table{
+        width:100%;
+        margin-top:20px;
         }
 
         .address-box{
-        width:45%;
+        width:50%;
         font-size:14px;
         line-height:20px;
+        vertical-align:top;
         }
 
         table{
@@ -65,17 +72,17 @@
         }
 
         .totals{
+        width:300px;
         margin-top:20px;
-        width:40%;
-        float:right;
+        margin-left:auto;
         }
 
-        .totals table{
-        width:100%;
+        .grand-total{
+        background:#f9f2ff;
+        font-size:16px;
         }
 
         .pay-section{
-        clear:both;
         margin-top:40px;
         text-align:center;
         }
@@ -96,94 +103,116 @@
         text-align:center;
         }
 
+        .divider{
+        height:1px;
+        background:#eee;
+        margin-top:20px;
+        }
+
     </style>
 
 </head>
 
 <body>
 
-<!-- HEADER -->
+<table class="header-table">
 
-<div class="header">
+    <tr>
 
-    <div class="logo">BillMe</div>
+        <td class="logo">BillMe</td>
 
-    <div class="invoice-meta">
-        <div>Invoice #: <span th:text="${invoiceNumber}"></span></div>
-        <div>Date: <span th:text="${invoiceDate}"></span></div>
-    </div>
+        <td class="invoice-meta">
 
-</div>
+            <div>
+                Invoice #: <span th:text="${invoiceNumber}"></span>
+            </div>
 
-<!-- BILLING SECTION -->
+            <div>
+                Date:
+                <span th:text="${invoiceDate}"></span>            </div>
 
-<div class="section address-container">
+            <div class="status">
+                Status:
+                <span class="status-badge"
+                      th:text="${status}">
+</span>
+            </div>
 
-    <div class="address-box">
-        <strong>Bill From</strong><br>
+        </td>
 
-        <span th:text="${merchantName}"></span><br>
-        <span th:text="${merchantAddress}"></span><br>
-        GSTIN: <span th:text="${merchantGstin}"></span>
+    </tr>
 
-    </div>
+</table>
 
-    <div class="address-box">
+<div class="divider"></div>
 
-        <strong>Bill To</strong><br>
+<table class="billing-table">
 
-        <span th:text="${customerName}"></span><br>
-        <span th:text="${customerEmail}"></span><br>
-        <span th:text="${customerAddress}"></span>
+    <tr>
 
-    </div>
+        <td class="address-box">
 
-</div>
+            <strong>Bill From</strong><br/>
 
-<!-- ITEMS -->
+            <span th:text="${merchantName}"></span><br/>
+            <span th:text="${merchantAddress}"></span><br/>
 
-<div class="section">
+            <span th:if="${merchantGstin != null}">
+GSTIN: <span th:text="${merchantGstin}"></span>
+</span>
 
-    <table>
+        </td>
 
-        <thead>
+        <td class="address-box">
 
-        <tr>
-            <th>Product</th>
-            <th>Qty</th>
-            <th>Unit Price</th>
-            <th>GST %</th>
-            <th>GST Amount</th>
-            <th>Total</th>
-        </tr>
+            <strong>Bill To</strong><br/>
 
-        </thead>
+            <span th:text="${customerName}"></span><br/>
+            <span th:text="${customerEmail}"></span><br/>
+            <span th:text="${customerAddress}"></span>
 
-        <tbody>
+        </td>
 
-        <tr th:each="item : ${items}">
+    </tr>
 
-            <td th:text="${item.productName}"></td>
+</table>
 
-            <td th:text="${item.quantity}"></td>
+<table>
 
-            <td th:text="${item.unitPrice}"></td>
+    <thead>
 
-            <td th:text="${item.gstRate}"></td>
+    <tr>
+        <th>Product</th>
+        <th>Qty</th>
+        <th>Unit Price</th>
+        <th>GST %</th>
+        <th>GST Amount</th>
+        <th>Total</th>
+    </tr>
 
-            <td th:text="${item.gstAmount}"></td>
+    </thead>
 
-            <td th:text="${item.totalPrice}"></td>
+    <tbody>
 
-        </tr>
+    <tr th:each="item : ${items}">
 
-        </tbody>
+        <td th:text="${item.productName}"></td>
 
-    </table>
+        <td th:text="${item.quantity}"></td>
 
-</div>
+        <td th:text="'₹' + ${item.unitPrice}"></td>
 
-<!-- TOTALS -->
+        <td th:text="${item.gstRate} + '%'"></td>
+
+        <td th:text="'₹' + ${item.gstAmount}"></td>
+
+        <td th:text="'₹' + ${item.totalPrice}"></td>
+
+    </tr>
+
+    </tbody>
+
+</table>
 
 <div class="totals">
 
@@ -191,24 +220,22 @@
 
         <tr>
             <td>Subtotal</td>
-            <td th:text="${subtotal}"></td>
+            <td th:text="'₹' + ${subtotal}"></td>
         </tr>
 
         <tr>
             <td>Processing Fee</td>
-            <td th:text="${processingFee}"></td>
+            <td th:text="'₹' + ${processingFee}"></td>
         </tr>
 
-        <tr>
+        <tr class="grand-total">
             <td><strong>Total Payable</strong></td>
-            <td><strong th:text="${totalPayable}"></strong></td>
+            <td><strong th:text="'₹' + ${totalPayable}"></strong></td>
         </tr>
 
     </table>
 
 </div>
-
-<!-- PAY BUTTON -->
 
 <div class="pay-section">
 
@@ -219,15 +246,11 @@
 
 </div>
 
-<!-- FOOTER -->
-
 <div class="footer">
 
     <p>This invoice was generated using BillMe.</p>
 
-    <p>
-        Payments must be completed through the BillMe platform.
-    </p>
+    <p>Payments must be completed through the BillMe platform.</p>
 
 </div>
 

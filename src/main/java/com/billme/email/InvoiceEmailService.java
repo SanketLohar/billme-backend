@@ -2,6 +2,7 @@ package com.billme.email;
 
 import com.billme.invoice.Invoice;
 import com.billme.invoice.InvoicePdfService;
+import com.billme.invoice.InvoiceTemplateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -15,12 +16,17 @@ public class InvoiceEmailService {
 
     private final JavaMailSender mailSender;
     private final InvoicePdfService pdfService;
+    private final InvoiceTemplateService templateService; // ✅ FIX
 
     public void sendInvoiceEmail(Invoice invoice) {
 
         try {
 
-            byte[] pdf = pdfService.generatePdf(invoice);
+            // Generate HTML invoice
+            String html = templateService.generateInvoiceHtml(invoice);
+
+            // Convert to PDF
+            byte[] pdf = pdfService.generatePdf(html);
 
             MimeMessage message = mailSender.createMimeMessage();
 

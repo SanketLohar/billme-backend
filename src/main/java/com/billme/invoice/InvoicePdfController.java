@@ -15,6 +15,7 @@ public class InvoicePdfController {
 
     private final InvoiceRepository invoiceRepository;
     private final InvoicePdfService pdfService;
+    private final InvoiceTemplateService templateService; // 👈 ADD THIS
 
     @Transactional(readOnly = true)
     @GetMapping("/{id}/pdf")
@@ -23,7 +24,11 @@ public class InvoicePdfController {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
-        byte[] pdf = pdfService.generatePdf(invoice);
+        // Generate HTML
+        String html = templateService.generateInvoiceHtml(invoice);
+
+        // Convert HTML → PDF
+        byte[] pdf = pdfService.generatePdf(html);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,

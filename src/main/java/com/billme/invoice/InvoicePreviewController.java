@@ -21,6 +21,7 @@ public class InvoicePreviewController {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
-        return invoiceTemplateService.renderInvoiceHtml(invoice);
+        // ✅ Correct method
+        return invoiceTemplateService.generateInvoiceHtml(invoice);
     }
 }

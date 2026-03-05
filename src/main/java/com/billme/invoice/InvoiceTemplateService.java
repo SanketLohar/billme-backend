@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.time.format.DateTimeFormatter;
 import java.util.stream.Collectors;
 
 @Service
@@ -14,30 +15,62 @@ public class InvoiceTemplateService {
 
     private final TemplateEngine templateEngine;
 
-    public String renderInvoiceHtml(Invoice invoice) {
+    public String generateInvoiceHtml(Invoice invoice) {
 
         Context context = new Context();
 
+        DateTimeFormatter formatter =
+                DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
+
         context.setVariable("invoiceNumber", invoice.getInvoiceNumber());
-        context.setVariable("invoiceDate", invoice.getIssuedAt());
 
-        context.setVariable("merchantName",
-                invoice.getMerchant().getBusinessName());
+        context.setVariable(
+                "invoiceDate",
+                invoice.getIssuedAt() != null
+                        ? invoice.getIssuedAt().format(formatter)
+                        : ""
+        );
 
-        context.setVariable("merchantAddress",
-                invoice.getMerchant().getAddress());
+        context.setVariable(
+                "status",
+                invoice.getStatus() != null
+                        ? invoice.getStatus().name()
+                        : ""
+        );
 
-        context.setVariable("merchantGstin",
-                invoice.getMerchant().getGstin());
+        context.setVariable(
+                "merchantName",
+                invoice.getMerchant().getBusinessName()
+        );
 
-        context.setVariable("customerName",
-                invoice.getCustomer().getName());
+        context.setVariable(
+                "merchantAddress",
+                invoice.getMerchant().getAddress() != null
+                        ? invoice.getMerchant().getAddress()
+                        : ""
+        );
 
-        context.setVariable("customerEmail",
-                invoice.getCustomer().getUser().getEmail());
+        context.setVariable(
+                "merchantGstin",
+                invoice.getMerchant().getGstin()
+        );
 
-        context.setVariable("customerAddress",
-                invoice.getCustomer().getAddress());
+        context.setVariable(
+                "customerName",
+                invoice.getCustomer().getName()
+        );
+
+        context.setVariable(
+                "customerEmail",
+                invoice.getCustomer().getUser().getEmail()
+        );
+
+        context.setVariable(
+                "customerAddress",
+                invoice.getCustomer().getAddress() != null
+                        ? invoice.getCustomer().getAddress()
+                        : ""
+        );
 
         context.setVariable("subtotal", invoice.getSubtotal());
         context.setVariable("processingFee", invoice.getProcessingFee());
