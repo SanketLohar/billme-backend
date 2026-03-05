@@ -137,11 +137,9 @@ public class InvoiceService {
 
 // amount used for merchant settlement
         invoice.setAmount(merchantAmount);
-        invoiceRepository.save(invoice);
-        invoiceRepository.save(invoice);
+        Invoice savedInvoice = invoiceRepository.save(invoice);
 
-        invoiceEmailService.sendInvoiceEmail(invoice);
-    }
+        invoiceEmailService.sendInvoiceEmail(savedInvoice);    }
 
     // =====================================================
     // PRODUCT RESOLUTION (ID OR BARCODE)
