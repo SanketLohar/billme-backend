@@ -17,8 +17,11 @@ public class InvoiceEmailService {
 
     private final JavaMailSender mailSender;
     private final InvoicePdfService pdfService;
-    private final InvoiceTemplateService templateService; // ✅ FIX
-@Async
+    private final InvoiceTemplateService templateService;
+
+    private final String frontendUrl = "http://localhost:5173"; // change later
+
+    @Async
     public void sendInvoiceEmail(Invoice invoice) {
 
         try {
@@ -38,16 +41,33 @@ public class InvoiceEmailService {
 
             helper.setSubject("Invoice " + invoice.getInvoiceNumber());
 
+            // 🔐 Secure Pay Now Link
+            String payLink = frontendUrl
+                    + "/pay/invoice/"
+                    + invoice.getInvoiceNumber()
+                    + "?token="
+                    + invoice.getPaymentToken();
+
             helper.setText("""
                     Hello,
 
                     You have received an invoice from %s.
 
+                    Amount Due: ₹%s
+
+                    Pay your invoice securely using the link below:
+
+                    %s
+
                     Please find the invoice attached.
 
                     Thank you,
                     BillMe
-                    """.formatted(invoice.getMerchant().getBusinessName()));
+                    """.formatted(
+                    invoice.getMerchant().getBusinessName(),
+                    invoice.getTotalPayable(),
+                    payLink
+            ));
 
             helper.addAttachment(
                     "invoice-" + invoice.getInvoiceNumber() + ".pdf",

@@ -5,6 +5,7 @@ import com.billme.email.InvoiceEmailService;
 import com.billme.invoice.dto.CreateInvoiceItemRequest;
 import com.billme.invoice.dto.CustomerInvoiceResponse;
 import com.billme.invoice.dto.InvoiceItemResponse;
+import com.billme.invoice.dto.PublicInvoiceResponse;
 import com.billme.merchant.MerchantProfile;
 import com.billme.payment.RazorpayService;
 import com.billme.product.Product;
@@ -26,7 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.math.RoundingMode;
-
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -71,6 +72,10 @@ public class InvoiceService {
         invoice.setMerchant(merchant);
         invoice.setCustomer(customer);
 
+        // 🔐 Generate secure payment token BEFORE saving
+        String paymentToken = UUID.randomUUID().toString().replace("-", "");
+        invoice.setPaymentToken(paymentToken);
+
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal gstTotal = BigDecimal.ZERO;
 
@@ -88,10 +93,8 @@ public class InvoiceService {
 
             BigDecimal quantity = BigDecimal.valueOf(itemRequest.getQuantity());
 
-            // base price
             BigDecimal baseAmount = product.getPrice().multiply(quantity);
 
-            // GST calculation
             BigDecimal gstRate = product.getGstRate() != null
                     ? product.getGstRate()
                     : BigDecimal.ZERO;
@@ -119,27 +122,31 @@ public class InvoiceService {
             gstTotal = gstTotal.add(gstAmount);
         }
 
-        // Processing fee only on subtotal
+        // Processing fee on subtotal
         BigDecimal processingFee = subtotal
                 .multiply(processingFeePercent)
-                .divide(BigDecimal.valueOf(100), 2,RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
         BigDecimal totalPayable = subtotal
                 .add(gstTotal)
-                .add(processingFee);
+                .add(processingFee)
+                .setScale(2, RoundingMode.HALF_UP);
 
-// merchant receives subtotal + gst
+        // Merchant receives subtotal + GST
         BigDecimal merchantAmount = subtotal.add(gstTotal);
 
         invoice.setSubtotal(subtotal);
         invoice.setProcessingFee(processingFee);
         invoice.setTotalPayable(totalPayable);
 
-// amount used for merchant settlement
+        // Amount used for settlement
         invoice.setAmount(merchantAmount);
+
         Invoice savedInvoice = invoiceRepository.save(invoice);
 
-        invoiceEmailService.sendInvoiceEmail(savedInvoice);    }
+        // 📧 send email after save
+        invoiceEmailService.sendInvoiceEmail(savedInvoice);
+    }
 
     // =====================================================
     // PRODUCT RESOLUTION (ID OR BARCODE)
@@ -368,5 +375,27 @@ public class InvoiceService {
         invoice.setStatus(InvoiceStatus.PENDING);
 
         return order.get("id");
+    }
+
+    @Transactional(readOnly = true)
+    public PublicInvoiceResponse getPublicInvoice(String invoiceNumber, String token) {
+
+        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
+        if (!invoice.getPaymentToken().equals(token)) {
+            throw new RuntimeException("Invalid payment token");
+        }
+
+        MerchantProfile merchant = invoice.getMerchant();
+        CustomerProfile customer = invoice.getCustomer();
+
+        return new PublicInvoiceResponse(
+                invoice.getInvoiceNumber(),
+                merchant.getBusinessName(),
+                customer.getName(),
+                invoice.getTotalPayable(),
+                invoice.getStatus().name()
+        );
     }
 }

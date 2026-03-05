@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+
+
 @Entity
 @Getter
 @Setter
@@ -77,7 +79,19 @@ public class Invoice {
     @Column(nullable = false)
     private BigDecimal totalPayable;
 
+    @Column(name = "payment_token", unique = true, nullable = false)
+    private String paymentToken;
+
     @Column(name = "refund_window_expiry")
     private LocalDateTime refundWindowExpiry;
+
+
+    public String getPaymentToken() {
+        return paymentToken;
+    }
+
+    public void setPaymentToken(String paymentToken) {
+        this.paymentToken = paymentToken;
+    }
 
 }

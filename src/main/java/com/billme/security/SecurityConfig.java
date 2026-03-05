@@ -44,7 +44,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/webhooks/**").permitAll()
                         .requestMatchers("/invoice/*/preview").permitAll()
                         .requestMatchers("/invoice/*/pdf").permitAll()
-
+                        .requestMatchers("/public/**").permitAll()
 
                         .anyRequest().authenticated()
                 )

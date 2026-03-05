@@ -16,6 +16,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByCustomer_User_IdAndStatus(Long userId, InvoiceStatus status);
 
+    Optional<Invoice> findByInvoiceNumber(String invoiceNumber);
+
     Optional<Invoice> findByIdAndCustomer_User_Id(Long invoiceId, Long userId);
     Optional<Invoice> findByRazorpayOrderId(String razorpayOrderId);
     // Merchant invoice fetch
