@@ -86,6 +86,9 @@ public class Invoice {
     @Column(name = "refund_window_expiry")
     private LocalDateTime refundWindowExpiry;
 
+    @Column(name = "payment_started_at")
+    private LocalDateTime paymentStartedAt;
+
 
     public String getPaymentToken() {
         return paymentToken;

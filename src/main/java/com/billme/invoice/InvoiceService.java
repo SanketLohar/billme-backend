@@ -374,16 +374,34 @@ public class InvoiceService {
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
-        if (invoice.getStatus() != InvoiceStatus.UNPAID) {
+        if (invoice.getStatus() != InvoiceStatus.UNPAID &&
+                invoice.getStatus() != InvoiceStatus.PENDING) {
             throw new RuntimeException("Only unpaid invoices can be paid");
         }
 
-        // 🔒 PAYMENT LOCK
+        // 🔥 Payment lock check
         if (Boolean.TRUE.equals(invoice.getPaymentInProgress())) {
-            throw new RuntimeException("Payment already in progress");
+
+            // Check timeout
+            if (invoice.getPaymentStartedAt() != null &&
+                    invoice.getPaymentStartedAt().isBefore(LocalDateTime.now().minusMinutes(10))) {
+
+                // 🔥 release stale payment lock
+                invoice.setPaymentInProgress(false);
+                invoice.setPaymentStartedAt(null);
+
+                // 🔥 clear old Razorpay order
+                invoice.setRazorpayOrderId(null);
+
+                // 🔥 reset invoice state
+                invoice.setStatus(InvoiceStatus.UNPAID);
+            } else {
+                throw new RuntimeException("Payment already in progress");
+            }
         }
 
         invoice.setPaymentInProgress(true);
+        invoice.setPaymentStartedAt(LocalDateTime.now());
 
         var order = razorpayService.createOrder(invoice);
 
