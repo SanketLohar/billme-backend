@@ -20,6 +20,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @Table(name = "invoices")
+
 public class Invoice {
 
     @Id
@@ -93,5 +94,8 @@ public class Invoice {
     public void setPaymentToken(String paymentToken) {
         this.paymentToken = paymentToken;
     }
+
+    @Column(name = "payment_in_progress")
+    private Boolean paymentInProgress = false;
 
 }

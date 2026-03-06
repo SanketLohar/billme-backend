@@ -1,6 +1,7 @@
 package com.billme.payment;
 
 import com.billme.invoice.Invoice;
+import com.billme.invoice.InvoiceStatus;
 import com.billme.invoice.PaymentMethod;
 import com.billme.repository.InvoiceRepository;
 import com.billme.repository.PaymentTransactionRepository;
@@ -27,6 +28,7 @@ public class RazorpayWebhookService {
         JSONObject json = new JSONObject(payload);
 
         String event = json.optString("event", "");
+
         if (!"payment.captured".equals(event)) {
             return;
         }
@@ -63,6 +65,7 @@ public class RazorpayWebhookService {
                 .findByRazorpayOrderId(orderId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
+        // 🔒 Idempotency check
         if (paymentTransactionRepository
                 .findByRazorpayPaymentId(paymentId)
                 .isPresent()) {
@@ -83,8 +86,16 @@ public class RazorpayWebhookService {
 
         paymentTransactionRepository.save(transaction);
 
-        // 🔥 Set payment method here (NOT in settlement)
+        // 🔥 Mark invoice PAID
+        invoice.setStatus(InvoiceStatus.PAID);
+        invoice.setPaidAt(LocalDateTime.now());
+
+        // 🔓 Release payment lock
+        invoice.setPaymentInProgress(false);
+
+        // 🔥 Set payment method
         invoice.setPaymentMethod(PaymentMethod.UPI_PAY);
+
         invoiceRepository.save(invoice);
 
         settlementService.settlePayment(

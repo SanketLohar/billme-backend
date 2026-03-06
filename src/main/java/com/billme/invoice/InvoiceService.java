@@ -44,6 +44,13 @@ public class InvoiceService {
 
     @Value("${processing.fee.percent}")
     private BigDecimal processingFeePercent;
+
+    private String generatePaymentToken() {
+        return UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 10);
+    }
     // =====================================================
     // CREATE INVOICE (STRICT PHASE 6 VERSION)
     // =====================================================
@@ -73,7 +80,9 @@ public class InvoiceService {
         invoice.setCustomer(customer);
 
         // 🔐 Generate secure payment token BEFORE saving
-        String paymentToken = UUID.randomUUID().toString().replace("-", "");
+
+
+        String paymentToken = generatePaymentToken();
         invoice.setPaymentToken(paymentToken);
 
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -368,6 +377,13 @@ public class InvoiceService {
         if (invoice.getStatus() != InvoiceStatus.UNPAID) {
             throw new RuntimeException("Only unpaid invoices can be paid");
         }
+
+        // 🔒 PAYMENT LOCK
+        if (Boolean.TRUE.equals(invoice.getPaymentInProgress())) {
+            throw new RuntimeException("Payment already in progress");
+        }
+
+        invoice.setPaymentInProgress(true);
 
         var order = razorpayService.createOrder(invoice);
 

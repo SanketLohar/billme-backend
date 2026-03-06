@@ -61,24 +61,24 @@ public class RazorpayWebhookController {
     }
 
 //    // 🔥 Debug endpoint (temporary)
-//    @PostMapping("/debug-signature")
-//    public String generateSignature(@RequestBody String payload) throws Exception {
-//
-//        Mac mac = Mac.getInstance("HmacSHA256");
-//
-//        SecretKeySpec secretKeySpec =
-//                new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8),
-//                        "HmacSHA256");
-//
-//        mac.init(secretKeySpec);
-//
-//        byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
-//
-//        StringBuilder hexString = new StringBuilder();
-//        for (byte b : hash) {
-//            hexString.append(String.format("%02x", b));
-//        }
-//
-//        return hexString.toString();
-//    }
+    @PostMapping("/debug-signature")
+   public String generateSignature(@RequestBody String payload) throws Exception {
+
+        Mac mac = Mac.getInstance("HmacSHA256");
+
+        SecretKeySpec secretKeySpec =
+                new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8),
+                        "HmacSHA256");
+
+        mac.init(secretKeySpec);
+
+        byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : hash) {
+            hexString.append(String.format("%02x", b));
+        }
+
+    return hexString.toString();
+  }
 }
