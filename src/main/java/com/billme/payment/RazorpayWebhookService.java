@@ -20,7 +20,6 @@ public class RazorpayWebhookService {
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final RazorpayVerificationService verificationService;
     private final PaymentSettlementService settlementService;
-
     @Transactional
     public void processWebhook(String payload) {
 
@@ -64,10 +63,13 @@ public class RazorpayWebhookService {
                 .findByRazorpayOrderId(orderId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
-        // Idempotency check
-        if (paymentTransactionRepository
-                .findByRazorpayPaymentId(paymentId)
-                .isPresent()) {
+        // 🔒 IDEMPOTENCY GUARD
+        boolean alreadyProcessed =
+                paymentTransactionRepository
+                        .findByRazorpayPaymentId(paymentId)
+                        .isPresent();
+
+        if (alreadyProcessed) {
             return;
         }
 
@@ -85,15 +87,15 @@ public class RazorpayWebhookService {
 
         paymentTransactionRepository.save(transaction);
 
-        // set payment method only
+        // set payment method
         invoice.setPaymentMethod(PaymentMethod.UPI_PAY);
 
         invoiceRepository.save(invoice);
 
-        // FINAL SETTLEMENT
+        // final settlement
         settlementService.settlePayment(
                 invoice,
-                invoice.getSubtotal(),
+                invoice.getTotalPayable(),
                 paymentId
         );
     }

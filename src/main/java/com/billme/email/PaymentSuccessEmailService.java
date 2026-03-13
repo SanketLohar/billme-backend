@@ -22,7 +22,7 @@ public class PaymentSuccessEmailService {
 
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
-            helper.setTo(invoice.getCustomer().getUser().getEmail());
+            helper.setTo(invoice.getResolvedCustomerEmail());
 
             helper.setSubject("Payment Received - Invoice " + invoice.getInvoiceNumber());
 
@@ -40,7 +40,7 @@ public class PaymentSuccessEmailService {
                     Regards,
                     BillMe Team
                     """.formatted(
-                    invoice.getCustomer().getName(),
+                    invoice.getResolvedCustomerName(),
                     invoice.getInvoiceNumber(),
                     invoice.getTotalPayable(),
                     invoice.getMerchant().getBusinessName()

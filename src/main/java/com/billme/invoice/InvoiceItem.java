@@ -46,4 +46,19 @@ public class InvoiceItem {
     // total price including GST
     @Column(nullable = false)
     private BigDecimal totalPrice;
+
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal baseAmount;
+
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal gstTotal;
+
+    @Column(precision = 19, scale = 2)
+    private BigDecimal cgstAmount;
+
+    @Column(precision = 19, scale = 2)
+    private BigDecimal sgstAmount;
+
+    @Column(precision = 19, scale = 2)
+    private BigDecimal igstAmount;
 }

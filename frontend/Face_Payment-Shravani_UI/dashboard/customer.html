@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BillMe — Customer Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../src/global.css">
+    <script src="../src/translations.js"></script>
+<script src="../src/i18n.js"></script>
+    <style>
+        body { background: var(--bg); font-family: 'Inter', sans-serif; overflow-x: hidden; }
+
+        /* ── Layout ── */
+        .dash-layout { display: flex; min-height: 100vh; }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #fff;
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            position: fixed; top: 0; left: 0; height: 100vh;
+            z-index: 100; transition: transform 0.3s;
+            overflow-y: auto;
+        }
+        .sidebar.collapsed { transform: translateX(calc(-1 * var(--sidebar-width))); }
+
+        .sidebar-logo {
+            padding: 24px;
+            display: flex; align-items: center; gap: 12px;
+            font-size: 22px; font-weight: 800; color: var(--primary);
+            border-bottom: 1px solid var(--border);
+        }
+        .sidebar-logo i { 
+            width: 38px; height: 38px; border-radius: 50%;
+            background: var(--gradient); display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 16px;
+        }
+
+        .sidebar-profile {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+        .sidebar-profile img {
+            width: 80px; height: 80px; border-radius: 50%;
+            border: 3px solid var(--primary-light); margin-bottom: 12px;
+            object-fit: cover;
+        }
+        .sidebar-profile__name { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+        .sidebar-profile__sub { font-size: 13px; color: var(--text-secondary); }
+
+        .sidebar-nav { flex: 1; padding: 12px 0; }
+        .nav-item a {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 24px; color: var(--text-secondary);
+            font-size: 14px; font-weight: 500; transition: all 0.2s;
+            text-decoration: none;
+        }
+        .nav-item a i { width: 20px; text-align: center; font-size: 16px; }
+        .nav-item a:hover { background: var(--bg); color: var(--primary); }
+        .nav-item.active a { background: var(--primary-light); color: var(--primary); font-weight: 600; border-right: 4px solid var(--primary); }
+
+        .sidebar-footer { padding: 20px; border-top: 1px solid var(--border); }
+
+        /* ── Main content ── */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+            transition: margin 0.3s;
+        }
+
+        .topbar {
+            height: var(--topbar-height);
+            background: #fff; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 28px; position: sticky; top: 0; z-index: 90;
+        }
+        .topbar__title { font-size: 20px; font-weight: 700; }
+
+        .page-area { padding: 28px; flex: 1; }
+        .section-page { display: none; }
+        .section-page.active { display: block; }
+
+        /* ── Profile Grid ── */
+        .profile-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; }
+        @media (max-width: 900px) { .profile-grid { grid-template-columns: 1fr; } }
+        
+        .info-list { list-style: none; }
+        .info-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .info-item:last-child { border-bottom: none; }
+        .info-label { color: var(--text-secondary); font-size: 14px; }
+        .info-value { font-weight: 600; font-size: 14px; }
+
+        /* ── Loading ── */
+        #pageLoader {
+            position: fixed; inset: 0; background: var(--gradient);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+
+<div id="pageLoader">
+    <div class="spinner" style="border-top-color:white;border-color:rgba(255,255,255,0.3);width:50px;height:50px;border-width:5px;"></div>
+    <h2 style="margin-top:16px;">BillMe</h2>
+    <p style="opacity:0.8;">Loading your dashboard...</p>
+</div>
+
+<div class="dash-layout" id="dashLayout" style="display:none;">
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <i class="fas fa-bolt"></i> BillMe
+        </div>
+        <div class="sidebar-profile">
+            <img id="side-avatar" src="https://ui-avatars.com/api/?name=Customer&background=1a73e8&color=fff" alt="Avatar">
+            <div class="sidebar-profile__name" id="side-name">Customer Name</div>
+            <div class="sidebar-profile__sub" id="side-id">Customer ID</div>
+        </div>
+        <nav class="sidebar-nav">
+            <ul style="list-style:none;">
+                <li class="nav-item active" data-section="overview">
+                    <a href="#"><i class="fas fa-th-large"></i> <span data-i18n="dash_overview">Overview</span></a>
+                </li>
+                <li class="nav-item" data-section="invoices">
+                    <a href="#"><i class="fas fa-file-invoice-dollar"></i> <span data-i18n="dash_invoices">My Invoices</span></a>
+                </li>
+                <li class="nav-item" data-section="profile">
+                    <a href="#"><i class="fas fa-user-circle"></i> <span data-i18n="dash_profile">Profile Settings</span></a>
+                </li>
+            </ul>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="btn btn-secondary w-100" id="logoutBtn">
+                <i class="fas fa-sign-out-alt"></i> <span data-i18n="dash_logout">Sign Out</span>
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="topbar">
+            <div class="topbar__title" id="pageTitle">Overview</div>
+            <div class="topbar__right">
+                <!-- Language Switcher -->
+                <div class="language-dropdown-container" style="margin-right:20px;">
+                    <div class="language-switcher" onclick="toggleLangDropdown()">
+                        <i class="fas fa-globe"></i>
+                        <span id="currentLang">EN</span>
+                        <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                    </div>
+                    <div class="language-dropdown" id="langDropdown">
+                        <div class="lang-option" onclick="setLanguage('en')">English (EN)</div>
+                        <div class="lang-option" onclick="setLanguage('hi')">हिन्दी (HI)</div>
+                        <div class="lang-option" onclick="setLanguage('mr')">मराठी (MR)</div>
+                    </div>
+                </div>
+                <div class="badge badge-info" id="tierBadge">Gold Tier</div>
+            </div>
+        </div>
+
+        <!-- NEW: Preview Modal -->
+        <div id="previewModal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:2000; align-items:center; justify-content:center; padding:20px;">
+            <div class="modal-content" style="background:#fff; width:100%; max-width:900px; height:90vh; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; position:relative;">
+                <div class="modal-header" style="padding:16px 24px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <h3 id="previewTitle">Invoice Preview</h3>
+                    <button onclick="closePreview()" style="background:none; border:none; font-size:24px; cursor:pointer;">&times;</button>
+                </div>
+                <div id="previewBody" style="flex:1; overflow-y:auto; padding:20px;">
+                    <!-- Preview content loaded here -->
+                    <div id="previewLoading" style="display:flex; align-items:center; justify-content:center; height:100%;">
+                        <div class="spinner"></div>
+                        <p style="margin-left:12px;">Generating preview...</p>
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding:16px 24px; border-top:1px solid #eee; text-align:right;">
+                    <button class="btn btn-secondary" onclick="closePreview()">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-area">
+            <!-- ══ OVERVIEW SECTION ══ -->
+            <div class="section-page active" id="sec-overview">
+                <div class="grid-4 mb-4">
+                    <div class="stat-card">
+                        <div class="stat-card__label">Total Spent</div>
+                        <div class="stat-card__value" id="stat-total-spent">₹0.00</div>
+                        <div class="stat-card__sub">Lifetime transactions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Invoices</div>
+                        <div class="stat-card__value" id="stat-total-purchases">0</div>
+                        <div class="stat-card__sub">Total purchases</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Avg Order</div>
+                        <div class="stat-card__value" id="stat-avg-order">₹0.00</div>
+                        <div class="stat-card__sub">Per transaction</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Merchants</div>
+                        <div class="stat-card__value" id="stat-merchants">0</div>
+                        <div class="stat-card__sub">Different stores</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Recent Invoices</h3>
+                        <button class="btn btn-primary btn-sm" onclick="showSection('invoices')">View All</button>
+                    </div>
+                    <div class="data-table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th><th>Merchant</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentInvoicesBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ INVOICES SECTION ══ -->
+            <div class="section-page" id="sec-invoices">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>All Invoices</h3>
+                    </div>
+                    <div class="data-table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th><th>Merchant</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allInvoicesBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ PROFILE SECTION ══ -->
+            <div class="section-page" id="sec-profile">
+                <div class="profile-grid">
+                    <div class="card">
+                        <img id="prof-avatar" src="https://ui-avatars.com/api/?name=Customer&background=1a73e8&color=fff" alt="Avatar" style="width:120px;height:120px;border-radius:50%;margin:0 auto 20px;display:block;border:4px solid var(--primary-light);">
+                        <h3 class="text-center" id="prof-name">Customer Name</h3>
+                        <p class="text-center text-muted mb-3" id="prof-email">email@example.com</p>
+                        <div class="badge badge-success d-flex justify-center" id="prof-tier">Gold Tier</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Account Details</h3>
+                        </div>
+                        <ul class="info-list">
+                            <li class="info-item"><span class="info-label">Customer ID</span><span class="info-value" id="prof-id">#CUST-123</span></li>
+                            <li class="info-item"><span class="info-label">Location</span><span class="info-value" id="prof-location">Mumbai, India</span></li>
+                            <li class="info-item"><span class="info-label">Join Date</span><span class="info-value" id="prof-join">Jan 20, 2024</span></li>
+                            <li class="info-item"><span class="info-label">Last Active</span><span class="info-value" id="prof-active">Today</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Final Footer -->
+<footer style="padding: 20px 28px; border-top: 1px solid var(--border); background: #fff; font-size: 13px; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; margin-left: var(--sidebar-width);">
+    <div>&copy; <span id="currentYear">2026</span> BillMe — Customer Dashboard</div>
+    <div style="display: flex; gap: 16px;">
+        <span data-i18n="footer_secure"><i class="fas fa-shield-halved"></i> Secure Payments</span>
+    </div>
+</footer>
+
+<script src="../src/api.js"></script>
+<script>
+
+const token = localStorage.getItem("billme_token");
+const role = localStorage.getItem("billme_role");
+
+if (!token || role !== "customer") {
+    window.location.href = "../src/login.html";
+}
+
+/* =========================
+   Dashboard Init
+========================= */
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Dynamic year
+    const yearEl = document.getElementById('currentYear');
+    if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+    try {
+
+        await loadCustomerData();
+
+        const loader = document.getElementById('pageLoader');
+        const layout = document.getElementById('dashLayout');
+
+        if (loader) loader.style.display = 'none';
+        if (layout) layout.style.display = 'flex';
+
+    } catch (err) {
+
+        console.error('Failed to load dashboard:', err);
+
+        if (typeof showToast === "function") {
+            showToast('Failed to load dashboard data', 'error');
+        }
+    }
+
+    /* =========================
+       Navigation
+    ========================= */
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+
+        item.addEventListener('click', () => {
+
+            const section = item.getAttribute('data-section');
+            showSection(section);
+
+        });
+
+    });
+
+    /* =========================
+       Logout
+    ========================= */
+
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+
+            localStorage.removeItem("billme_token");
+            localStorage.removeItem("billme_role");
+            localStorage.removeItem("billme_user_id");
+
+            window.location.href = "../index.html";
+
+        });
+    }
+
+});
+
+/* =========================
+   Section Switch
+========================= */
+
+function showSection(sectionId) {
+
+    document.querySelectorAll('.section-page')
+        .forEach(sec => sec.classList.remove('active'));
+
+    document.querySelectorAll('.nav-item')
+        .forEach(nav => nav.classList.remove('active'));
+
+    const section = document.getElementById('sec-' + sectionId);
+    if (section) section.classList.add('active');
+
+    const nav = document.querySelector(`.nav-item[data-section="${sectionId}"]`);
+    if (nav) nav.classList.add('active');
+
+    const titles = {
+        overview: 'Overview',
+        invoices: 'My Invoices',
+        profile: 'Profile Settings'
+    };
+
+    const titleEl = document.getElementById('pageTitle');
+    if (titleEl) titleEl.innerText = titles[sectionId] || 'Dashboard';
+}
+
+/* =========================
+   Load Customer Data
+========================= */
+
+async function loadCustomerData() {
+
+    if (!window.API) {
+        throw new Error("API client not loaded.");
+    }
+
+    /* ---------- PROFILE ---------- */
+
+    const profile = await window.API.customer.getProfile();
+
+    if (profile) {
+
+        const name = profile.fullName || profile.username || "Customer";
+
+        const avatarUrl =
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a73e8&color=fff`;
+
+        setText('side-name', name);
+        setText('side-id', '#' + (profile.id || 'CUST'));
+
+        setText('prof-name', name);
+        setText('prof-email', profile.email);
+        setText('prof-id', '#' + (profile.id || 'CUST'));
+        setText('prof-location', profile.location || 'Not Set');
+
+        setText('prof-join',
+            profile.createdAt
+                ? new Date(profile.createdAt).toLocaleDateString()
+                : '-'
+        );
+
+        setText('prof-active',
+            profile.lastActive
+                ? new Date(profile.lastActive).toLocaleDateString()
+                : 'Active Now'
+        );
+
+        setImage('side-avatar', avatarUrl);
+        setImage('prof-avatar', avatarUrl);
+    }
+
+    /* ---------- INVOICES ---------- */
+
+    const invoices = await window.API.customer.getInvoices();
+
+    renderInvoices(invoices || []);
+    updateAnalytics(invoices || []);
+}
+
+/* =========================
+   Render Invoices
+========================= */
+
+function renderInvoices(invoices) {
+
+    const recentBody = document.getElementById('recentInvoicesBody');
+    const allBody = document.getElementById('allInvoicesBody');
+
+    if (!recentBody || !allBody) return;
+
+    const rows = invoices.map(inv => {
+
+        // 1. Normalize ID
+        const invoiceId = inv.id || inv.invoiceId;
+        if (!invoiceId) return '';
+
+        const amount = Number(inv.totalPayable || 0);
+        const isPaid = inv.status === 'PAID';
+
+        return `
+        <tr>
+            <td>${inv.invoiceNumber || "-"}</td>
+            <td>${inv.merchantName || "Merchant"}</td>
+            <td class="fw-600">₹${amount.toFixed(2)}</td>
+            <td>
+                <span class="badge badge-${isPaid ? 'success' : 'warning'}">
+                    ${inv.status || "PENDING"}
+                </span>
+            </td>
+            <td>${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : "-"}</td>
+            <td>
+                <div class="d-flex gap-1">
+                    <!-- Preview -->
+                    <button class="btn btn-secondary btn-sm"
+                        onclick="previewInvoice('${invoiceId}')" title="Preview">
+                        <i class="fas fa-eye"></i>
+                    </button>
+
+                    <!-- Download -->
+                    <button class="btn btn-secondary btn-sm"
+                        onclick="downloadInvoice('${invoiceId}')" title="Download PDF">
+                        <i class="fas fa-download"></i>
+                    </button>
+
+                    <!-- Conditional Action: Pay vs Refund -->
+                    ${!isPaid
+                        ? `<button class="btn btn-primary btn-sm"
+                             onclick="payInvoice('${invoiceId}')">Pay Now</button>`
+                        : `<button class="btn btn-outline-danger btn-sm"
+                             onclick="refundInvoice('${invoiceId}')">Refund</button>`
+                    }
+                </div>
+            </td>
+        </tr>
+        `;
+
+    }).join('');
+
+    allBody.innerHTML =
+        invoices.length
+            ? rows
+            : '<tr><td colspan="6" class="text-center text-muted">No invoices found</td></tr>';
+
+    recentBody.innerHTML =
+        invoices.length
+            ? rows.split('</tr>').slice(0, 5).join('</tr>')
+            : '<tr><td colspan="6" class="text-center text-muted">No recent activity</td></tr>';
+}
+
+/* =========================
+   Analytics
+========================= */
+
+function updateAnalytics(invoices) {
+
+    const paidInvoices = invoices.filter(i => i.status === 'PAID');
+
+    const totalSpent =
+        paidInvoices.reduce((sum, i) => sum + Number(i.totalPayable || 0), 0);
+
+    const distinctMerchants =
+        new Set(invoices.map(i => i.merchantName)).size;
+
+    setText('stat-total-spent', `₹${totalSpent.toLocaleString()}`);
+    setText('stat-total-purchases', invoices.length);
+
+    setText(
+        'stat-avg-order',
+        invoices.length
+            ? `₹${(totalSpent / invoices.length).toFixed(2)}`
+            : '₹0.00'
+    );
+
+    setText('stat-merchants', distinctMerchants);
+}
+
+/* =========================
+   Invoice Actions
+========================= */
+
+/* =========================
+   Invoice Actions
+========================= */
+
+async function previewInvoice(invoiceId) {
+    if (!invoiceId || invoiceId === 'undefined') {
+        showToast('Invalid Invoice ID', 'error');
+        return;
+    }
+
+    const modal = document.getElementById('previewModal');
+    const body = document.getElementById('previewBody');
+    const loading = document.getElementById('previewLoading');
+
+    modal.style.display = 'flex';
+    loading.style.display = 'flex';
+    
+    // Clear previous content
+    const oldContent = body.querySelector('.preview-content');
+    if (oldContent) oldContent.remove();
+
+    try {
+        const previewData = await window.API.invoice.getPreview(invoiceId);
+        
+        loading.style.display = 'none';
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'preview-content';
+        
+        // If content is HTML (common for previews)
+        if (typeof previewData === 'string' && previewData.trim().startsWith('<')) {
+            contentDiv.innerHTML = previewData;
+        } else {
+            // Otherwise show JSON or raw text
+            contentDiv.innerHTML = `<pre style="background:#f8f9fa; padding:15px; border-radius:8px;">${JSON.stringify(previewData, null, 2)}</pre>`;
+        }
+        
+        body.appendChild(contentDiv);
+        document.getElementById('previewTitle').innerText = `Preview: Invoice #${invoiceId}`;
+
+    } catch (err) {
+        console.error('Preview failed:', err);
+        showToast('Failed to load invoice preview', 'error');
+        closePreview();
+    }
+}
+
+function closePreview() {
+    document.getElementById('previewModal').style.display = 'none';
+}
+
+async function downloadInvoice(invoiceId) {
+    if (!invoiceId || invoiceId === 'undefined') {
+        showToast('Invalid Invoice ID', 'error');
+        return;
+    }
+
+    try {
+        showToast('Preparing download...', 'info');
+        
+        // Use the merchant method which handles /invoice/{id}/pdf
+        const blob = await window.API.merchant.downloadInvoicePdf(invoiceId);
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `invoice_${invoiceId}.pdf`;
+
+        document.body.appendChild(a);
+        a.click();
+        
+        // Cleanup
+        setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            a.remove();
+        }, 100);
+
+        showToast('Download started', 'success');
+
+    } catch (err) {
+        console.error('Download error:', err);
+        showToast(err.message || 'Failed to download invoice', 'error');
+    }
+}
+
+function payInvoice(invoiceId) {
+    if (!invoiceId || invoiceId === 'undefined') {
+        showToast('Invalid Invoice ID', 'error');
+        return;
+    }
+    window.location.href = `../pay-invoice.html?id=${invoiceId}`;
+}
+
+async function refundInvoice(invoiceId) {
+    if (!invoiceId || invoiceId === 'undefined') {
+        showToast('Invalid Invoice ID', 'error');
+        return;
+    }
+
+    if (!confirm('Are you sure you want to request a refund for this invoice?')) {
+        return;
+    }
+
+    try {
+        showToast('Initiating refund...', 'info');
+        
+        await window.API.payment.refund(invoiceId);
+        
+        showToast('Refund initiated successfully', 'success');
+        
+        // Reload data to show updated status
+        await loadCustomerData();
+
+    } catch (err) {
+        console.error('Refund failed:', err);
+        showToast(err.message || 'Failed to initiate refund', 'error');
+    }
+}
+
+/* =========================
+   Helpers
+========================= */
+
+function setText(id, value) {
+
+    const el = document.getElementById(id);
+    if (el) el.innerText = value;
+
+}
+
+function setImage(id, src) {
+
+    const el = document.getElementById(id);
+    if (el) el.src = src;
+
+}
+
+</script>
+</body>
+</html>

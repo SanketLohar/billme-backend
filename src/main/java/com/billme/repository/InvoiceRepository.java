@@ -29,6 +29,13 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
             Long userId,
             InvoiceStatus status
     );
+    List<Invoice> findByCustomerUserEmail(String email);
+    @Query("SELECT COALESCE(SUM(i.amount), 0) FROM Invoice i WHERE i.merchant.id = :merchantId AND i.status = :status")
+    BigDecimal sumAmountByMerchantIdAndStatus(@org.springframework.data.repository.query.Param("merchantId") Long merchantId, @org.springframework.data.repository.query.Param("status") InvoiceStatus status);
+
+    @Query("SELECT COALESCE(SUM(i.processingFee), 0) FROM Invoice i WHERE i.merchant.id = :merchantId AND i.status = :status")
+    BigDecimal sumProcessingFeeByMerchantIdAndStatus(@org.springframework.data.repository.query.Param("merchantId") Long merchantId, @org.springframework.data.repository.query.Param("status") InvoiceStatus status);
+
     @Query("""
        SELECT COALESCE(SUM(i.amount), 0)
        FROM Invoice i

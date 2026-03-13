@@ -35,8 +35,24 @@ public class Invoice {
     private MerchantProfile merchant;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = true)
     private CustomerProfile customer;
+
+    @Column
+    private String customerEmail;
+
+    @Column
+    private String customerName;
+
+    public String getResolvedCustomerName() {
+        if (customerName != null) return customerName;
+        return customer != null ? customer.getName() : "Unknown";
+    }
+
+    public String getResolvedCustomerEmail() {
+        if (customerEmail != null) return customerEmail;
+        return customer != null ? customer.getUser().getEmail() : "Unknown";
+    }
 
     @Column(nullable = false)
     private BigDecimal amount;
@@ -73,6 +89,18 @@ public class Invoice {
 
     @Column(nullable = false)
     private BigDecimal subtotal;
+
+    @Column
+    private BigDecimal cgstTotal;
+
+    @Column
+    private BigDecimal sgstTotal;
+
+    @Column
+    private BigDecimal igstTotal;
+
+    @Column
+    private BigDecimal gstTotal;
 
     @Column(nullable = false)
     private BigDecimal processingFee;

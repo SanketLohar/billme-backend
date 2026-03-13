@@ -19,5 +19,11 @@ public class InvoiceItemResponse {
 
     private BigDecimal gstAmount;
 
+    private BigDecimal cgstAmount;
+
+    private BigDecimal sgstAmount;
+
+    private BigDecimal igstAmount;
+
     private BigDecimal totalPrice;
 }

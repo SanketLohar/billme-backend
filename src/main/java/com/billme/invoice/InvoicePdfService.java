@@ -12,16 +12,19 @@ import java.io.InputStream;
 @RequiredArgsConstructor
 public class InvoicePdfService {
 
-    public byte[] generatePdf(String html) {
+    private final InvoiceTemplateService invoiceTemplateService;
+
+    public byte[] generateInvoicePdf(Invoice invoice) {
 
         try {
+
+            String html = invoiceTemplateService.generateInvoiceHtml(invoice);
 
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.withHtmlContent(html, null);
 
-            // Load rupee-compatible font
             ClassPathResource fontResource =
                     new ClassPathResource("fonts/NotoSans-Regular.ttf");
 

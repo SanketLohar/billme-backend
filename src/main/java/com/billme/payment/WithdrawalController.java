@@ -31,6 +31,11 @@ public class WithdrawalController {
                 withdrawalService.getWithdrawalHistory()
         );
     }
+    @GetMapping("/wallet")
+    public ResponseEntity<WalletSummaryResponse> getWallet() {
+        return getWalletSummary();
+    }
+
     @GetMapping("/wallet/summary")
     public ResponseEntity<WalletSummaryResponse> getWalletSummary() {
 

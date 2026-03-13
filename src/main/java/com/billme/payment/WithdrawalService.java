@@ -84,7 +84,7 @@ public class WithdrawalService {
         BigDecimal netPayout = amount.subtract(fee);
 
         // 💸 Debit full amount
-        walletService.debit(merchantWallet, amount);
+        walletService.debit(merchantWallet, amount, "WITHDRAW-" + System.currentTimeMillis());
 
         // 🧾 Withdrawal ledger
         Transaction withdrawalTx = Transaction.builder()

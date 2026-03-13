@@ -22,4 +22,7 @@ public class CustomerInvoiceResponse {
     private BigDecimal subtotal;
     private BigDecimal processingFee;
     private BigDecimal totalPayable;
+    private BigDecimal cgstAmount;
+    private BigDecimal sgstAmount;
+    private BigDecimal igstAmount;
 }

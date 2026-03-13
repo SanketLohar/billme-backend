@@ -1,8 +1,7 @@
 package com.billme.product.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
@@ -17,6 +16,11 @@ public class CreateProductRequest {
 
     private String barcode;
 
+@JsonAlias({"gstPercent","gst_rate"})
+@NotNull
+@Min(0)
+@Max(28)
+private Integer gstRate;
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
@@ -25,4 +29,7 @@ public class CreateProductRequest {
 
     public String getBarcode() { return barcode; }
     public void setBarcode(String barcode) { this.barcode = barcode; }
+
+    public Integer getGstRate() { return gstRate; }
+    public void setGstRate(Integer gstRate) { this.gstRate = gstRate; }
 }

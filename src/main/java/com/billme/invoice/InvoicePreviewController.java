@@ -1,27 +1,46 @@
 package com.billme.invoice;
 
-import com.billme.repository.InvoiceRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.ByteArrayInputStream;
+
 @RestController
+@RequestMapping("/api/invoices")
 @RequiredArgsConstructor
-@RequestMapping("/invoice")
 public class InvoicePreviewController {
 
-    private final InvoiceRepository invoiceRepository;
-    private final InvoiceTemplateService invoiceTemplateService;
+    private final InvoiceService invoiceService;
 
-    @Transactional(readOnly = true)
-    @GetMapping(value = "/{id}/preview", produces = MediaType.TEXT_HTML_VALUE)
-    public String previewInvoice(@PathVariable Long id) {
+    // ==========================================
+    // HTML PREVIEW (Browser View)
+    // ==========================================
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<InputStreamResource> previewInvoice(@PathVariable Long id) {
 
-        Invoice invoice = invoiceRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+        byte[] pdf = invoiceService.generateInvoicePdf(id);
 
-        // ✅ Correct method
-        return invoiceTemplateService.generateInvoiceHtml(invoice);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=invoice_" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(new InputStreamResource(new ByteArrayInputStream(pdf)));
+    }
+
+    // ==========================================
+    // DOWNLOAD PDF
+    // ==========================================
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<InputStreamResource> downloadInvoice(@PathVariable Long id) {
+
+        byte[] pdf = invoiceService.generateInvoicePdf(id);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=invoice_" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(new InputStreamResource(new ByteArrayInputStream(pdf)));
     }
 }

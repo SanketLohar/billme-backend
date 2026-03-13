@@ -22,7 +22,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
+import java.time.LocalDate;
+import java.time.Period;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -54,6 +55,29 @@ public class AuthService {
             );
         }
 
+        if (customerProfileRepository.findByFaceEmbeddings(request.getFaceEmbeddings()).isPresent()) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Face already registered"
+            );
+        }
+
+        if (request.getDob() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Date of birth is required"
+            );
+        }
+
+        int age = Period.between(request.getDob(), LocalDate.now()).getYears();
+
+        if (age < 18) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "User must be at least 18 years old"
+            );
+        }
+
         User user = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -66,6 +90,12 @@ public class AuthService {
         CustomerProfile profile = CustomerProfile.builder()
                 .user(user)
                 .name(request.getName())
+                .dob(request.getDob())
+                .contactNumber(request.getContactNumber())
+                .address(request.getAddress())
+                .state(request.getState())
+                .city(request.getCity())
+                .pinCode(request.getPinCode())
                 .faceEmbeddings(request.getFaceEmbeddings())
                 .build();
 
@@ -85,7 +115,12 @@ public class AuthService {
 
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
-        return new AuthResponse(accessToken, refreshToken.getToken());
+        return new AuthResponse(
+                accessToken,
+                refreshToken.getToken(),
+                user.getRole().name(),
+                user.getId()
+        );
     }
 
 
@@ -97,6 +132,22 @@ public class AuthService {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Merchant already registered"
+            );
+        }
+
+        if (request.getDob() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Date of birth is required"
+            );
+        }
+
+        int age = Period.between(request.getDob(), LocalDate.now()).getYears();
+
+        if (age < 18) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Merchant must be at least 18 years old"
             );
         }
 
@@ -114,9 +165,6 @@ public class AuthService {
                         .user(user)
                         .businessName(request.getBusinessName())
                         .ownerName(request.getOwnerName())
-                        .phone(request.getPhone())
-                        .address(request.getAddress())
-                        .upiId(request.getUpiId())
                         .profileCompleted(false)
                         .build()
         );
@@ -135,7 +183,12 @@ public class AuthService {
 
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
-        return new AuthResponse(accessToken, refreshToken.getToken());
+        return new AuthResponse(
+                accessToken,
+                refreshToken.getToken(),
+                user.getRole().name(),
+                user.getId()
+        );
     }
 
     // ================= LOGIN =================
@@ -205,6 +258,11 @@ public class AuthService {
         RefreshToken refreshToken =
                 refreshTokenService.createRefreshToken(user);
 
-        return new AuthResponse(accessToken, refreshToken.getToken());
+        return new AuthResponse(
+                accessToken,
+                refreshToken.getToken(),
+                user.getRole().name(),
+                user.getId()
+        );
     }
 }

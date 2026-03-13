@@ -21,6 +21,8 @@ public class CustomerService {
                 .id(profile.getId())
                 .name(profile.getName())
                 .email(profile.getUser().getEmail())
+                .state(profile.getState())
+                .city(profile.getCity())
                 .build();
     }
 }

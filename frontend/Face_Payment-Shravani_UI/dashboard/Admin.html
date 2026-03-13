@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BillMe — Admin Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../src/global.css">
+    <script src="../src/translations.js"></script>
+<script src="../src/i18n.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background: var(--bg); font-family: 'Inter', sans-serif; }
+        .dash-layout { display: flex; min-height: 100vh; }
+        
+        .sidebar {
+            width: var(--sidebar-width); background: #fff; border-right: 1px solid var(--border);
+            position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
+        }
+        .sidebar-logo {
+            padding: 24px; display: flex; align-items: center; gap: 12px;
+            font-size: 22px; font-weight: 800; color: var(--primary);
+            border-bottom: 1px solid var(--border);
+        }
+        .sidebar-logo i { 
+            width: 38px; height: 38px; border-radius: 50%;
+            background: var(--gradient); display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 16px;
+        }
+
+        .main-content { margin-left: var(--sidebar-width); flex: 1; display: flex; flex-direction: column; }
+        .topbar {
+            height: var(--topbar-height); background: #fff; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 28px; position: sticky; top: 0; z-index: 90;
+        }
+        .page-area { padding: 28px; }
+
+        .nav-item a {
+            display: flex; align-items: center; gap: 12px; padding: 12px 24px;
+            color: var(--text-secondary); font-size: 14px; font-weight: 500; text-decoration: none;
+        }
+        .nav-item.active a { background: var(--primary-light); color: var(--primary); border-right: 4px solid var(--primary); }
+        .nav-item a { cursor: pointer; }
+        
+        .sidebar { display: flex; flex-direction: column; }
+        .sidebar nav { flex: 1; overflow-y: auto; }
+        .sidebar-footer { padding: 20px; border-top: 1px solid var(--border); }
+        
+        .section-page { display: none; }
+        .section-page.active { display: block; }
+        
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+
+<div class="dash-layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo"><i class="fas fa-bolt"></i> BillMe</div>
+        <nav style="margin-top:20px;">
+            <ul style="list-style:none;">
+                <li class="nav-item active"><a href="#dashboard"><i class="fas fa-chart-line"></i> <span data-i18n="dash_overview">Dashboard</span></a></li>
+                <li class="nav-item"><a href="#merchants"><i class="fas fa-store"></i> <span data-i18n="nav_guides">Merchants</span></a></li>
+                <li class="nav-item"><a href="#customers"><i class="fas fa-users"></i> <span data-i18n="tab_customer">Customers</span></a></li>
+                <li class="nav-item"><a href="#transactions"><i class="fas fa-exchange-alt"></i> <span data-i18n="dash_transactions">Transactions</span></a></li>
+                <li class="nav-item"><a href="#settings"><i class="fas fa-cog"></i> <span data-i18n="nav_compliance">Settings</span></a></li>
+            </ul>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="btn btn-outline-danger w-100" id="logoutBtn">
+                <i class="fas fa-sign-out-alt"></i> <span data-i18n="dash_logout">Sign Out</span>
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="topbar">
+            <div style="font-size:20px; font-weight:700;">Admin Overview</div>
+            <div style="display:flex; align-items:center; gap:20px;">
+                <!-- Language Switcher -->
+                <div class="language-dropdown-container">
+                    <div class="language-switcher" onclick="toggleLangDropdown()">
+                        <i class="fas fa-globe"></i>
+                        <span id="currentLang">EN</span>
+                        <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                    </div>
+                    <div class="language-dropdown" id="langDropdown">
+                        <div class="lang-option" onclick="setLanguage('en')">English (EN)</div>
+                        <div class="lang-option" onclick="setLanguage('hi')">हिन्दी (HI)</div>
+                        <div class="lang-option" onclick="setLanguage('mr')">मराठी (MR)</div>
+                    </div>
+                </div>
+                <div id="admin-user">admin@billme.com</div>
+            </div>
+        </div>
+
+        <div class="page-area">
+            <!-- ══ DASHBOARD SECTION ══ -->
+            <div class="section-page active" id="sec-dashboard">
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-card__label">Total Merchants</div>
+                        <div class="stat-card__value" id="count-merchants">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Total Customers</div>
+                        <div class="stat-card__value" id="count-customers">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Total Transactions</div>
+                        <div class="stat-card__value" id="count-txns">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Platform Revenue</div>
+                        <div class="stat-card__value" id="platform-revenue">₹0</div>
+                    </div>
+                </div>
+
+                <div class="grid-2 mb-4">
+                    <div class="card">
+                        <div class="card-header"><h3>Transactions Trend</h3></div>
+                        <div style="height:300px;"><canvas id="txTrendChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>Payment Methods</h3></div>
+                        <div style="height:300px;"><canvas id="payDistChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header"><h3>Merchant Growth</h3></div>
+                        <div style="height:300px;"><canvas id="merchantGrowthChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>Recent Activity</h3></div>
+                        <div class="data-table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>User</th><th>Action</th><th>Status</th><th>Time</th></tr>
+                                </thead>
+                                <tbody id="adminActivityBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ MERCHANTS SECTION ══ -->
+            <div class="section-page" id="sec-merchants">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Registered Merchants</h3>
+                        <button class="btn btn-primary btn-sm" onclick="loadMerchants()">Refresh</button>
+                    </div>
+                    <div class="data-table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Business Name</th><th>Owner</th><th>Email</th><th>Status</th><th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="merchantsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ CUSTOMERS SECTION ══ -->
+            <div class="section-page" id="sec-customers">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Platform Customers</h3>
+                        <button class="btn btn-primary btn-sm" onclick="loadCustomers()">Refresh</button>
+                    </div>
+                    <div class="data-table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Customer ID</th><th>Name</th><th>Email</th><th>Total Spent</th><th>Joined</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customersTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ TRANSACTIONS SECTION ══ -->
+            <div class="section-page" id="sec-transactions">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Global Transactions</h3>
+                        <button class="btn btn-primary btn-sm" onclick="loadTransactions()">Refresh</button>
+                    </div>
+                    <div class="data-table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>TXN ID</th><th>Amount</th><th>Method</th><th>Merchant</th><th>Customer</th><th>Status</th><th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ SETTINGS SECTION ══ -->
+            <div class="section-page" id="sec-settings">
+                <div class="card">
+                    <div class="card-header"><h3>Admin Settings</h3></div>
+                    <div style="padding:20px; text-align:center; color:var(--text-secondary);">
+                        <i class="fas fa-tools" style="font-size:48px; margin-bottom:20px;"></i>
+                        <p>Advanced platform configurations coming soon.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Loader & Toast (API Compliance) -->
+<div id="pageLoader" style="display:none; position:fixed; inset:0; background:rgba(255,255,255,0.8); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+    <div class="spinner"></div>
+    <p style="margin-top:12px; font-weight:600;">Processing request...</p>
+</div>
+
+<!-- Final Footer -->
+<footer style="padding: 20px 28px; border-top: 1px solid var(--border); background: #fff; font-size: 13px; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; margin-left: var(--sidebar-width);">
+    <div>&copy; <span id="currentYear">2026</span> BillMe — Admin Portal</div>
+    <div style="display: flex; gap: 16px;">
+        <span>System Status: <span class="badge badge-success">Healthy</span></span>
+    </div>
+</footer>
+
+<script src="../src/api.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

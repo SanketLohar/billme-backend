@@ -49,7 +49,7 @@ public class RefundService {
             throw new RuntimeException("Refund window expired");
         }
 
-        BigDecimal amount = invoice.getAmount();
+        BigDecimal amount = invoice.getTotalPayable();
 
         Wallet merchantWallet = walletService.getWalletByUser(
                 invoice.getMerchant().getUser()
@@ -66,19 +66,24 @@ public class RefundService {
             );
 
             // Debit merchant wallet
-            walletService.debit(merchantWallet, amount);
+            walletService.debit(merchantWallet, amount, "REFUND-" + invoice.getInvoiceNumber());
         }
 
         // 🔥 CASE 2 — FACE_PAY
         else if (invoice.getPaymentMethod() == PaymentMethod.FACE_PAY) {
+            
+            if (invoice.getCustomer() == null) {
+                throw new RuntimeException("FacePay invoice missing customer");
+            }
 
             Wallet customerWallet = walletService.getWalletByUser(
                     invoice.getCustomer().getUser()
             );
 
             // Reverse internal wallet transfer
-            walletService.debit(merchantWallet, amount);
-            walletService.credit(customerWallet, amount);
+            String ref = "REFUND-FP-" + invoice.getInvoiceNumber();
+            walletService.debit(merchantWallet, amount, ref);
+            walletService.credit(customerWallet, amount, ref);
         }
 
         else {

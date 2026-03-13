@@ -2,6 +2,8 @@ package com.billme.auth;
 
 import lombok.Data;
 
+import java.time.LocalDate;
+
 @Data
 public class MerchantRegisterRequest {
 
@@ -10,8 +12,6 @@ public class MerchantRegisterRequest {
 
     private String businessName;
     private String ownerName;
-    private String phone;
-    private String address;
-    private String upiId;
 
+    private LocalDate dob;
 }

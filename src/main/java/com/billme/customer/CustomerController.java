@@ -3,30 +3,43 @@ package com.billme.customer;
 import com.billme.customer.dto.CustomerLookupResponse;
 import com.billme.repository.CustomerProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/customer")
+@RequestMapping("/api/customer")
 @RequiredArgsConstructor
 public class CustomerController {
 
     private final CustomerProfileRepository customerProfileRepository;
 
     // ==========================================
-    // EXISTING PROFILE API
+    // CUSTOMER PROFILE
     // ==========================================
     @GetMapping("/profile")
-    public String getCustomerProfile(Authentication authentication) {
-        return "Customer profile accessed by: " + authentication.getName();
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public CustomerLookupResponse getCustomerProfile(Authentication authentication) {
+
+        String email = authentication.getName();
+
+        CustomerProfile profile = customerProfileRepository
+                .findByUser_Email(email)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        return CustomerLookupResponse.builder()
+                .id(profile.getId())
+                .name(profile.getName())
+                .email(profile.getUser().getEmail())
+                .build();
     }
 
     // ==========================================
-    // NEW API → LOOKUP CUSTOMER BY EMAIL
+    // LOOKUP CUSTOMER BY EMAIL
     // ==========================================
     @GetMapping("/email/{email}")
-    public CustomerLookupResponse findCustomerByEmail(
-            @PathVariable String email) {
+    @PreAuthorize("hasRole('MERCHANT')")
+    public CustomerLookupResponse findCustomerByEmail(@PathVariable String email) {
 
         CustomerProfile profile = customerProfileRepository
                 .findByUser_Email(email)

@@ -32,7 +32,11 @@ public class Transaction {
     private Wallet receiverWallet;
 
     @Column(nullable = false)
-    private BigDecimal amount;
+    private BigDecimal amount; // Typically the total movement or customer payment
+
+    private BigDecimal invoiceAmount;
+    private BigDecimal processingFee;
+    private BigDecimal merchantSettlement;
 
     @Enumerated(EnumType.STRING)
     private TransactionType transactionType;

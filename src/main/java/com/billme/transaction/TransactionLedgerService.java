@@ -28,7 +28,7 @@ public class TransactionLedgerService {
                 .map(tx -> TransactionResponse.builder()
                         .invoiceNumber(tx.getInvoice().getInvoiceNumber())
                         .merchantName(tx.getInvoice().getMerchant().getBusinessName())
-                        .customerName(tx.getInvoice().getCustomer().getName())
+                        .customerName(tx.getInvoice().getResolvedCustomerName())
                         .amount(tx.getAmount())
                         .paymentMethod(
                                 tx.getInvoice().getPaymentMethod() != null
@@ -54,7 +54,7 @@ public class TransactionLedgerService {
                 .map(tx -> TransactionResponse.builder()
                         .invoiceNumber(tx.getInvoice().getInvoiceNumber())
                         .merchantName(tx.getInvoice().getMerchant().getBusinessName())
-                        .customerName(tx.getInvoice().getCustomer().getName())
+                        .customerName(tx.getInvoice().getResolvedCustomerName())
                         .amount(tx.getAmount())
                         .paymentMethod(
                                 tx.getInvoice().getPaymentMethod() != null

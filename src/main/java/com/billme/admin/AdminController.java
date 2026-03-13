@@ -18,4 +18,13 @@ public class AdminController {
     public ResponseEntity<AdminFinancialSummaryResponse> getSummary() {
         return ResponseEntity.ok(adminService.getFinancialSummary());
     }
+
+    // ==========================================
+    // ADMIN DASHBOARD
+    // ==========================================
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminFinancialSummaryResponse> getDashboard() {
+        return ResponseEntity.ok(adminService.getFinancialSummary());
+    }
 }

@@ -30,8 +30,8 @@ public class Product {
     private BigDecimal price;
 
     // GST percentage
-    @Column(nullable = false)
-    private BigDecimal gstRate = BigDecimal.ZERO;
+    @Column(name = "gst_rate")
+    private Integer gstRate;
 
     private String barcode;
 
@@ -62,8 +62,8 @@ public class Product {
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
 
-    public BigDecimal getGstRate() { return gstRate; }
-    public void setGstRate(BigDecimal gstRate) { this.gstRate = gstRate; }
+    public Integer getGstRate() { return gstRate; }
+    public void setGstRate(Integer gstRate) { this.gstRate = gstRate; }
 
     public String getBarcode() { return barcode; }
     public void setBarcode(String barcode) { this.barcode = barcode; }

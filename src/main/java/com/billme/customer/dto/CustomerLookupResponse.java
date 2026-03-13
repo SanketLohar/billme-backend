@@ -8,6 +8,12 @@ import lombok.Data;
 public class CustomerLookupResponse {
 
     private Long id;
+
     private String name;
+
     private String email;
+
+    private String state;
+    private String city;
+
 }

@@ -29,6 +29,9 @@ public class Wallet {
     @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
 
+    @Column(nullable = false)
+    private BigDecimal escrowBalance = BigDecimal.ZERO;
+
     private LocalDateTime createdAt;
 
     @PrePersist

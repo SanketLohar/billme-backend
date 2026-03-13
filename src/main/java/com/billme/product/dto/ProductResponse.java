@@ -7,6 +7,7 @@ public class ProductResponse {
     private Long id;
     private String name;
     private BigDecimal price;
+    private Integer gstRate;
     private String barcode;
 
     public Long getId() { return id; }
@@ -20,4 +21,7 @@ public class ProductResponse {
 
     public String getBarcode() { return barcode; }
     public void setBarcode(String barcode) { this.barcode = barcode; }
+
+    public Integer getGstRate() { return gstRate; }
+    public void setGstRate(Integer gstRate) { this.gstRate = gstRate; }
 }

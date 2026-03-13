@@ -40,6 +40,17 @@ public class ProductService {
         product.setPrice(request.getPrice());
         product.setBarcode(request.getBarcode());
 
+        System.out.println("DEBUG: CreateProductRequest.getGstRate() = " + request.getGstRate());
+        if(request.getGstRate() == null){
+            throw new IllegalArgumentException("GST rate is required");
+        }
+
+        if(request.getGstRate() < 0 || request.getGstRate() > 28){
+            throw new IllegalArgumentException("Invalid GST rate");
+        }
+
+        product.setGstRate(request.getGstRate());
+
         productRepository.save(product);
 
         return mapToResponse(product);
@@ -62,6 +73,7 @@ public class ProductService {
         res.setId(product.getId());
         res.setName(product.getName());
         res.setPrice(product.getPrice());
+        res.setGstRate(product.getGstRate());
         res.setBarcode(product.getBarcode());
         return res;
     }

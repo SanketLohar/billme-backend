@@ -15,6 +15,7 @@ public class AuthController {
     private final AuthService authService;
     private final RefreshTokenService refreshTokenService;
     private final JwtService jwtService;
+    private final PasswordResetService passwordResetService;
 
     // ================= CUSTOMER REGISTER =================
     @PostMapping("/register/customer")
@@ -55,10 +56,14 @@ public class AuthController {
                 );
 
         return ResponseEntity.ok(
-                new AuthResponse(newAccessToken, request.getRefreshToken())
+                new AuthResponse(
+                        newAccessToken,
+                        request.getRefreshToken(),
+                        refreshToken.getUser().getRole().name(),
+                        refreshToken.getUser().getId()
+                )
         );
     }
-
 
     // ================= LOGOUT =================
     @PostMapping("/logout")
@@ -70,4 +75,27 @@ public class AuthController {
         return ResponseEntity.ok("Logged out successfully");
     }
 
+    // ================= PASSWORD RESET =================
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(
+            @RequestBody ForgotPasswordRequest request) {
+
+        passwordResetService.requestPasswordReset(request.getEmail());
+
+        return ResponseEntity.ok(
+                "If an account exists, a password reset email has been sent."
+        );
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(
+            @RequestBody ResetPasswordRequest request) {
+
+        passwordResetService.resetPassword(
+                request.getToken(),
+                request.getNewPassword()
+        );
+
+        return ResponseEntity.ok("Password reset successfully.");
+    }
 }

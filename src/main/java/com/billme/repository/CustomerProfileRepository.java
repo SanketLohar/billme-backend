@@ -11,4 +11,5 @@ public interface CustomerProfileRepository
 
     java.util.Optional<CustomerProfile> findByUser_Email(String email);
 
+    Optional<CustomerProfile> findByFaceEmbeddings(String faceEmbeddings);
 }
