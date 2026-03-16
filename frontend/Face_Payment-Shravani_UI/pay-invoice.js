@@ -16,7 +16,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const merchantGst = document.getElementById('merchant-gst');
     const itemsList = document.getElementById('items-list');
     const subTotalElem = document.getElementById('sub-total');
-    const taxTotalElem = document.getElementById('tax-total');
+    const platformFeeElem = document.getElementById('platform-fee'); // NEW
+    const cgstElem = document.getElementById('cgst-total'); // NEW
+    const sgstElem = document.getElementById('sgst-total'); // NEW
+    const taxTotalElem = document.getElementById('tax-total'); // Keep for safety if exists
     const grandTotalElem = document.getElementById('grand-total');
     const invoiceLabel = document.getElementById('invoice-label');
 
@@ -36,21 +39,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!invoice) throw new Error("Invoice not found or link expired");
         currentInvoice = invoice;
 
-        // Populate UI
-        merchantName.innerText = invoice.merchantName || 'BillMe Merchant';
-        merchantGst.innerText = invoice.merchantGSTIN ? `GSTIN: ${invoice.merchantGSTIN}` : 'GST Not Applicable';
-        invoiceLabel.innerText = `Invoice #${invoice.invoiceNumber}`;
+        // Populate UI with null guards
+        if (merchantName) merchantName.innerText = invoice.merchantName || 'BillMe Merchant';
+        if (merchantGst) merchantGst.innerText = invoice.merchantGSTIN ? `GSTIN: ${invoice.merchantGSTIN}` : 'GST Not Applicable';
+        if (invoiceLabel) invoiceLabel.innerText = `Invoice #${invoice.invoiceNumber}`;
         
-        itemsList.innerHTML = (invoice.items || []).map(item => `
-            <div class="item-row">
-                <span>${esc(item.productName)} (x${item.quantity})</span>
-                <span class="fw-600">₹${(item.totalPrice || 0).toFixed(2)}</span>
-            </div>
-        `).join('');
-
-        subTotalElem.innerText = `₹${(invoice.subtotal || 0).toFixed(2)}`;
-        taxTotalElem.innerText = `₹${(invoice.gstTotal || 0).toFixed(2)}`;
-        grandTotalElem.innerText = `₹${(invoice.totalPayable || 0).toFixed(2)}`;
+        if (itemsList) {
+            itemsList.innerHTML = (invoice.items || []).map(item => `
+                <div class="item-row">
+                    <span>${esc(item.productName)} (x${item.quantity})</span>
+                    <span class="fw-600">₹${(item.totalPrice || 0).toFixed(2)}</span>
+                </div>
+            `).join('');
+        }
+    
+        if (subTotalElem) subTotalElem.innerText = `₹${(invoice.subtotal || 0).toFixed(2)}`;
+        if (platformFeeElem) platformFeeElem.innerText = `₹${(invoice.processingFee || 0).toFixed(2)}`;
+        if (cgstElem) cgstElem.innerText = `₹${(invoice.cgstAmount || 0).toFixed(2)}`;
+        if (sgstElem) sgstElem.innerText = `₹${(invoice.sgstAmount || 0).toFixed(2)}`;
+        // Fallback for legacy total tax if container exists
+        if (taxTotalElem) taxTotalElem.innerText = `₹${(invoice.gstTotal || 0).toFixed(2)}`;
+        if (grandTotalElem) grandTotalElem.innerText = `₹${(invoice.totalPayable || 0).toFixed(2)}`;
 
         loader.style.display = 'none';
         content.style.display = 'block';
@@ -143,7 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const descriptor = Array.from(detection.descriptor);
             // Use API.payment namespace as standardized
-            const res = await window.API.payment.payWithFace(currentInvoice.id, { embedding: descriptor });
+            const res = await window.API.payment.payWithFace(currentInvoice.id, { embedding: JSON.stringify(descriptor) });
 
             if (res) showSuccess();
         } catch (err) {

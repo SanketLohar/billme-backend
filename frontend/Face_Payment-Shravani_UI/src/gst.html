@@ -7,9 +7,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="global.css">
-    <script src="translations.js" defer></script>
-    <script src="i18n.js" defer></script>
-    <style>
+    <!-- <!-- <script src="translations.js" defer></script> --> -->
+<script src="i18n.js" defer></script>    <style>
         .gst-hero {
             background: linear-gradient(135deg, #0d47a1 0%, #176bef 100%);
             color: white; padding: 100px 28px 80px; text-align: center;
@@ -78,10 +77,10 @@
                 <div class="language-dropdown-container">
                     <div class="language-switcher" onclick="toggleLangDropdown()">
                         <i class="fas fa-globe"></i>
-                        <span id="currentLang">EN</span>
+                        <span id="current-lang">EN</span>
                         <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                     </div>
-                    <div class="language-dropdown" id="langDropdown">
+                    <div class="language-dropdown" id="lang-menu">
                         <div class="lang-option" onclick="setLanguage('en')">English (EN)</div>
                         <div class="lang-option" onclick="setLanguage('hi')">हिन्दी (HI)</div>
                         <div class="lang-option" onclick="setLanguage('mr')">मराठी (MR)</div>

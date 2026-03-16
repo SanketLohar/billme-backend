@@ -13,6 +13,9 @@ import com.billme.user.Role;
 import com.billme.user.User;
 import com.billme.wallet.Wallet;
 import com.billme.wallet.WalletService;
+import com.billme.notification.NotificationService;
+import com.billme.notification.NotificationType;
+import com.billme.email.RefundEmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,16 +34,97 @@ public class RefundService {
     private final TransactionRepository transactionRepository;
     private final RazorpayService razorpayService;
     private final UserRepository userRepository;
-    private final WalletRepository walletRepository;
+    private final RefundTokenService refundTokenService;
+    private final NotificationService notificationService;
+    private final RefundEmailService refundEmailService;
+
+    @Transactional
+    public void validateAndProcessRefund(Long invoiceId, Long merchantId, boolean approve) {
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
+        // 🔒 Verify merchant ownership
+        if (!invoice.getMerchant().getId().equals(merchantId)) {
+            throw new RuntimeException("Security violation: Merchant ID mismatch");
+        }
+
+        // 🔒 Ensure correct status for email approval
+        if (invoice.getStatus() != InvoiceStatus.REFUND_REQUESTED) {
+            throw new RuntimeException("Invoice is not in REFUND_REQUESTED state. Current status: " + invoice.getStatus());
+        }
+
+        if (approve) {
+            refundInvoice(invoiceId);
+        } else {
+            rejectRefund(invoiceId);
+        }
+    }
+
+    @Transactional
+    public void requestRefund(Long invoiceId) {
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
+        if (invoice.getStatus() != InvoiceStatus.PAID) {
+            throw new RuntimeException("Only paid invoices can be refunded");
+        }
+
+        invoice.setStatus(InvoiceStatus.REFUND_REQUESTED);
+        invoiceRepository.save(invoice);
+
+        // Notify Customer
+        User customerUser = invoice.getCustomer().getUser();
+        notificationService.createNotification(
+                customerUser,
+                "Refund request submitted for Invoice " + invoice.getInvoiceNumber(),
+                NotificationType.INFO
+        );
+
+        // Notify Merchant
+        User merchantUser = invoice.getMerchant().getUser();
+        notificationService.createNotification(
+                merchantUser,
+                "Refund request received for Invoice " + invoice.getInvoiceNumber(),
+                NotificationType.REFUND_REQUESTED
+        );
+
+        // Send Email
+        String approveToken = refundTokenService.generateRefundToken(invoice.getId(), invoice.getMerchant().getId());
+        String rejectToken = refundTokenService.generateRefundToken(invoice.getId(), invoice.getMerchant().getId());
+        
+        refundEmailService.sendRefundRequestEmail(
+                merchantUser.getEmail(),
+                invoice.getInvoiceNumber(),
+                invoice.getCustomer() != null ? invoice.getCustomer().getName() : "Customer",
+                invoice.getTotalPayable(),
+                invoice.getPaymentMethod().name(),
+                approveToken,
+                rejectToken
+        );
+    }
+
+    @Transactional
+    public void rejectRefund(Long invoiceId) {
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
+        if (invoice.getStatus() != InvoiceStatus.REFUND_REQUESTED) {
+            throw new RuntimeException("Invoice is not in refund requested status");
+        }
+
+        invoice.setStatus(InvoiceStatus.REFUND_REJECTED);
+        invoiceRepository.save(invoice);
+    }
+
     @Transactional
     public void refundInvoice(Long invoiceId) {
 
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
-        // 🔒 Must be PAID
-        if (invoice.getStatus() != InvoiceStatus.PAID) {
-            throw new RuntimeException("Only paid invoices can be refunded");
+        // 🔒 Must be PAID or REFUND_REQUESTED
+        if (invoice.getStatus() != InvoiceStatus.PAID && invoice.getStatus() != InvoiceStatus.REFUND_REQUESTED) {
+            throw new RuntimeException("Only paid or refund-requested invoices can be refunded");
         }
 
         // 🔒 Must be inside refund window
@@ -56,8 +140,8 @@ public class RefundService {
         );
 
 
-        // 🔥 CASE 1 — Razorpay Payment
-        if (invoice.getPaymentMethod() == PaymentMethod.UPI_PAY) {
+        // 🔥 CASE 1 — Razorpay Payment (UPI_PAY or CARD)
+        if (invoice.getPaymentMethod() == PaymentMethod.UPI_PAY || invoice.getPaymentMethod() == PaymentMethod.CARD) {
 
             // Call Razorpay refund API
             razorpayService.refundPayment(
@@ -106,6 +190,17 @@ public class RefundService {
         // 🔁 Update invoice status
         invoice.setStatus(InvoiceStatus.REFUNDED);
         invoiceRepository.save(invoice);
+
+        // Notify Customer and Send Email
+        if (invoice.getCustomer() != null && invoice.getCustomer().getUser() != null) {
+            User customerUser = invoice.getCustomer().getUser();
+            notificationService.createNotification(
+                    customerUser,
+                    "Refund completed for Invoice " + invoice.getInvoiceNumber(),
+                    NotificationType.REFUND_COMPLETED
+            );
+            refundEmailService.sendRefundCompletedEmail(customerUser.getEmail(), invoice.getInvoiceNumber());
+        }
 
         System.out.println("Refund processed for invoice: " + invoiceId);
     }

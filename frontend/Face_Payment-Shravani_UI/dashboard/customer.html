@@ -7,8 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../src/global.css">
-    <script src="../src/translations.js"></script>
-<script src="../src/i18n.js"></script>
+    <script src="../src/i18n.js" defer></script>
     <style>
         body { background: var(--bg); font-family: 'Inter', sans-serif; overflow-x: hidden; }
 
@@ -146,20 +145,29 @@
         <div class="topbar">
             <div class="topbar__title" id="pageTitle">Overview</div>
             <div class="topbar__right">
+                <!-- NEW: Notifications Bell -->
+                <div class="notification-container" style="position:relative; margin-right: 16px; cursor: pointer;" id="notificationBell" onclick="toggleNotifications()">
+                    <i class="fas fa-bell" style="font-size: 20px; color: var(--text-secondary);"></i>
+                    <span id="notifBadge" style="display:none; position:absolute; top:-6px; right:-8px; background:var(--danger); color:white; font-size:10px; font-weight:bold; padding:2px 5px; border-radius:10px;">0</span>
+                    <div class="language-dropdown" id="notifDropdown" style="width: 320px; right: 0; padding: 10px; max-height: 400px; overflow-y: auto;">
+                        <h4 style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">Notifications</h4>
+                        <div id="notifList" style="font-size: 13px; color: var(--text-secondary);">Loading...</div>
+                    </div>
+                </div>
+
                 <!-- Language Switcher -->
                 <div class="language-dropdown-container" style="margin-right:20px;">
                     <div class="language-switcher" onclick="toggleLangDropdown()">
                         <i class="fas fa-globe"></i>
-                        <span id="currentLang">EN</span>
+                        <span id="current-lang">EN</span>
                         <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                     </div>
-                    <div class="language-dropdown" id="langDropdown">
+                    <div class="language-dropdown" id="lang-menu">
                         <div class="lang-option" onclick="setLanguage('en')">English (EN)</div>
                         <div class="lang-option" onclick="setLanguage('hi')">हिन्दी (HI)</div>
                         <div class="lang-option" onclick="setLanguage('mr')">मराठी (MR)</div>
                     </div>
                 </div>
-                <div class="badge badge-info" id="tierBadge">Gold Tier</div>
             </div>
         </div>
 
@@ -188,31 +196,31 @@
             <div class="section-page active" id="sec-overview">
                 <div class="grid-4 mb-4">
                     <div class="stat-card">
-                        <div class="stat-card__label">Total Spent</div>
+                        <div class="stat-card__label" data-i18n="dash_spent">Total Spent</div>
                         <div class="stat-card__value" id="stat-total-spent">₹0.00</div>
-                        <div class="stat-card__sub">Lifetime transactions</div>
+                        <div class="stat-card__sub" data-i18n="recent_activity_s">Lifetime transactions</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-card__label">Invoices</div>
+                        <div class="stat-card__label" data-i18n="dash_purchases">Invoices</div>
                         <div class="stat-card__value" id="stat-total-purchases">0</div>
-                        <div class="stat-card__sub">Total purchases</div>
+                        <div class="stat-card__sub" data-i18n="recent_activity_s2">Total purchases</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-card__label">Avg Order</div>
+                        <div class="stat-card__label" data-i18n="dash_avg_order">Avg Order</div>
                         <div class="stat-card__value" id="stat-avg-order">₹0.00</div>
-                        <div class="stat-card__sub">Per transaction</div>
+                        <div class="stat-card__sub" data-i18n="recent_activity_s3">Per transaction</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-card__label">Merchants</div>
+                        <div class="stat-card__label" data-i18n="dash_merchants">Merchants</div>
                         <div class="stat-card__value" id="stat-merchants">0</div>
-                        <div class="stat-card__sub">Different stores</div>
+                        <div class="stat-card__sub" data-i18n="recent_activity_s4">Different stores</div>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <h3>Recent Invoices</h3>
-                        <button class="btn btn-primary btn-sm" onclick="showSection('invoices')">View All</button>
+                        <h3 data-i18n="dash_recent_inv">Recent Invoices</h3>
+                        <button class="btn btn-primary btn-sm" onclick="showSection('invoices')"><span data-i18n="btn_view_all">View All</span></button>
                     </div>
                     <div class="data-table-wrapper">
                         <table class="data-table">
@@ -284,398 +292,10 @@
     </div>
 </footer>
 
+<div id="toast-container" class="toast-container"></div>
+
 <script src="../src/api.js"></script>
-<script>
-
-const token = localStorage.getItem("billme_token");
-const role = localStorage.getItem("billme_role");
-
-if (!token || role !== "customer") {
-    window.location.href = "../src/login.html";
-}
-
-/* =========================
-   Dashboard Init
-========================= */
-
-document.addEventListener('DOMContentLoaded', async () => {
-    // Dynamic year
-    const yearEl = document.getElementById('currentYear');
-    if (yearEl) yearEl.textContent = new Date().getFullYear();
-
-    try {
-
-        await loadCustomerData();
-
-        const loader = document.getElementById('pageLoader');
-        const layout = document.getElementById('dashLayout');
-
-        if (loader) loader.style.display = 'none';
-        if (layout) layout.style.display = 'flex';
-
-    } catch (err) {
-
-        console.error('Failed to load dashboard:', err);
-
-        if (typeof showToast === "function") {
-            showToast('Failed to load dashboard data', 'error');
-        }
-    }
-
-    /* =========================
-       Navigation
-    ========================= */
-
-    document.querySelectorAll('.nav-item').forEach(item => {
-
-        item.addEventListener('click', () => {
-
-            const section = item.getAttribute('data-section');
-            showSection(section);
-
-        });
-
-    });
-
-    /* =========================
-       Logout
-    ========================= */
-
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-
-            localStorage.removeItem("billme_token");
-            localStorage.removeItem("billme_role");
-            localStorage.removeItem("billme_user_id");
-
-            window.location.href = "../index.html";
-
-        });
-    }
-
-});
-
-/* =========================
-   Section Switch
-========================= */
-
-function showSection(sectionId) {
-
-    document.querySelectorAll('.section-page')
-        .forEach(sec => sec.classList.remove('active'));
-
-    document.querySelectorAll('.nav-item')
-        .forEach(nav => nav.classList.remove('active'));
-
-    const section = document.getElementById('sec-' + sectionId);
-    if (section) section.classList.add('active');
-
-    const nav = document.querySelector(`.nav-item[data-section="${sectionId}"]`);
-    if (nav) nav.classList.add('active');
-
-    const titles = {
-        overview: 'Overview',
-        invoices: 'My Invoices',
-        profile: 'Profile Settings'
-    };
-
-    const titleEl = document.getElementById('pageTitle');
-    if (titleEl) titleEl.innerText = titles[sectionId] || 'Dashboard';
-}
-
-/* =========================
-   Load Customer Data
-========================= */
-
-async function loadCustomerData() {
-
-    if (!window.API) {
-        throw new Error("API client not loaded.");
-    }
-
-    /* ---------- PROFILE ---------- */
-
-    const profile = await window.API.customer.getProfile();
-
-    if (profile) {
-
-        const name = profile.fullName || profile.username || "Customer";
-
-        const avatarUrl =
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a73e8&color=fff`;
-
-        setText('side-name', name);
-        setText('side-id', '#' + (profile.id || 'CUST'));
-
-        setText('prof-name', name);
-        setText('prof-email', profile.email);
-        setText('prof-id', '#' + (profile.id || 'CUST'));
-        setText('prof-location', profile.location || 'Not Set');
-
-        setText('prof-join',
-            profile.createdAt
-                ? new Date(profile.createdAt).toLocaleDateString()
-                : '-'
-        );
-
-        setText('prof-active',
-            profile.lastActive
-                ? new Date(profile.lastActive).toLocaleDateString()
-                : 'Active Now'
-        );
-
-        setImage('side-avatar', avatarUrl);
-        setImage('prof-avatar', avatarUrl);
-    }
-
-    /* ---------- INVOICES ---------- */
-
-    const invoices = await window.API.customer.getInvoices();
-
-    renderInvoices(invoices || []);
-    updateAnalytics(invoices || []);
-}
-
-/* =========================
-   Render Invoices
-========================= */
-
-function renderInvoices(invoices) {
-
-    const recentBody = document.getElementById('recentInvoicesBody');
-    const allBody = document.getElementById('allInvoicesBody');
-
-    if (!recentBody || !allBody) return;
-
-    const rows = invoices.map(inv => {
-
-        // 1. Normalize ID
-        const invoiceId = inv.id || inv.invoiceId;
-        if (!invoiceId) return '';
-
-        const amount = Number(inv.totalPayable || 0);
-        const isPaid = inv.status === 'PAID';
-
-        return `
-        <tr>
-            <td>${inv.invoiceNumber || "-"}</td>
-            <td>${inv.merchantName || "Merchant"}</td>
-            <td class="fw-600">₹${amount.toFixed(2)}</td>
-            <td>
-                <span class="badge badge-${isPaid ? 'success' : 'warning'}">
-                    ${inv.status || "PENDING"}
-                </span>
-            </td>
-            <td>${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : "-"}</td>
-            <td>
-                <div class="d-flex gap-1">
-                    <!-- Preview -->
-                    <button class="btn btn-secondary btn-sm"
-                        onclick="previewInvoice('${invoiceId}')" title="Preview">
-                        <i class="fas fa-eye"></i>
-                    </button>
-
-                    <!-- Download -->
-                    <button class="btn btn-secondary btn-sm"
-                        onclick="downloadInvoice('${invoiceId}')" title="Download PDF">
-                        <i class="fas fa-download"></i>
-                    </button>
-
-                    <!-- Conditional Action: Pay vs Refund -->
-                    ${!isPaid
-                        ? `<button class="btn btn-primary btn-sm"
-                             onclick="payInvoice('${invoiceId}')">Pay Now</button>`
-                        : `<button class="btn btn-outline-danger btn-sm"
-                             onclick="refundInvoice('${invoiceId}')">Refund</button>`
-                    }
-                </div>
-            </td>
-        </tr>
-        `;
-
-    }).join('');
-
-    allBody.innerHTML =
-        invoices.length
-            ? rows
-            : '<tr><td colspan="6" class="text-center text-muted">No invoices found</td></tr>';
-
-    recentBody.innerHTML =
-        invoices.length
-            ? rows.split('</tr>').slice(0, 5).join('</tr>')
-            : '<tr><td colspan="6" class="text-center text-muted">No recent activity</td></tr>';
-}
-
-/* =========================
-   Analytics
-========================= */
-
-function updateAnalytics(invoices) {
-
-    const paidInvoices = invoices.filter(i => i.status === 'PAID');
-
-    const totalSpent =
-        paidInvoices.reduce((sum, i) => sum + Number(i.totalPayable || 0), 0);
-
-    const distinctMerchants =
-        new Set(invoices.map(i => i.merchantName)).size;
-
-    setText('stat-total-spent', `₹${totalSpent.toLocaleString()}`);
-    setText('stat-total-purchases', invoices.length);
-
-    setText(
-        'stat-avg-order',
-        invoices.length
-            ? `₹${(totalSpent / invoices.length).toFixed(2)}`
-            : '₹0.00'
-    );
-
-    setText('stat-merchants', distinctMerchants);
-}
-
-/* =========================
-   Invoice Actions
-========================= */
-
-/* =========================
-   Invoice Actions
-========================= */
-
-async function previewInvoice(invoiceId) {
-    if (!invoiceId || invoiceId === 'undefined') {
-        showToast('Invalid Invoice ID', 'error');
-        return;
-    }
-
-    const modal = document.getElementById('previewModal');
-    const body = document.getElementById('previewBody');
-    const loading = document.getElementById('previewLoading');
-
-    modal.style.display = 'flex';
-    loading.style.display = 'flex';
-    
-    // Clear previous content
-    const oldContent = body.querySelector('.preview-content');
-    if (oldContent) oldContent.remove();
-
-    try {
-        const previewData = await window.API.invoice.getPreview(invoiceId);
-        
-        loading.style.display = 'none';
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'preview-content';
-        
-        // If content is HTML (common for previews)
-        if (typeof previewData === 'string' && previewData.trim().startsWith('<')) {
-            contentDiv.innerHTML = previewData;
-        } else {
-            // Otherwise show JSON or raw text
-            contentDiv.innerHTML = `<pre style="background:#f8f9fa; padding:15px; border-radius:8px;">${JSON.stringify(previewData, null, 2)}</pre>`;
-        }
-        
-        body.appendChild(contentDiv);
-        document.getElementById('previewTitle').innerText = `Preview: Invoice #${invoiceId}`;
-
-    } catch (err) {
-        console.error('Preview failed:', err);
-        showToast('Failed to load invoice preview', 'error');
-        closePreview();
-    }
-}
-
-function closePreview() {
-    document.getElementById('previewModal').style.display = 'none';
-}
-
-async function downloadInvoice(invoiceId) {
-    if (!invoiceId || invoiceId === 'undefined') {
-        showToast('Invalid Invoice ID', 'error');
-        return;
-    }
-
-    try {
-        showToast('Preparing download...', 'info');
-        
-        // Use the merchant method which handles /invoice/{id}/pdf
-        const blob = await window.API.merchant.downloadInvoicePdf(invoiceId);
-        const url = window.URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `invoice_${invoiceId}.pdf`;
-
-        document.body.appendChild(a);
-        a.click();
-        
-        // Cleanup
-        setTimeout(() => {
-            window.URL.revokeObjectURL(url);
-            a.remove();
-        }, 100);
-
-        showToast('Download started', 'success');
-
-    } catch (err) {
-        console.error('Download error:', err);
-        showToast(err.message || 'Failed to download invoice', 'error');
-    }
-}
-
-function payInvoice(invoiceId) {
-    if (!invoiceId || invoiceId === 'undefined') {
-        showToast('Invalid Invoice ID', 'error');
-        return;
-    }
-    window.location.href = `../pay-invoice.html?id=${invoiceId}`;
-}
-
-async function refundInvoice(invoiceId) {
-    if (!invoiceId || invoiceId === 'undefined') {
-        showToast('Invalid Invoice ID', 'error');
-        return;
-    }
-
-    if (!confirm('Are you sure you want to request a refund for this invoice?')) {
-        return;
-    }
-
-    try {
-        showToast('Initiating refund...', 'info');
-        
-        await window.API.payment.refund(invoiceId);
-        
-        showToast('Refund initiated successfully', 'success');
-        
-        // Reload data to show updated status
-        await loadCustomerData();
-
-    } catch (err) {
-        console.error('Refund failed:', err);
-        showToast(err.message || 'Failed to initiate refund', 'error');
-    }
-}
-
-/* =========================
-   Helpers
-========================= */
-
-function setText(id, value) {
-
-    const el = document.getElementById(id);
-    if (el) el.innerText = value;
-
-}
-
-function setImage(id, src) {
-
-    const el = document.getElementById(id);
-    if (el) el.src = src;
-
-}
-
-</script>
+<script src="../src/notification.js"></script>
+<script src="customer.js"></script>
 </body>
 </html>

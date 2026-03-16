@@ -42,13 +42,15 @@ public class ReportController {
     }
 
     @GetMapping("/transactions")
-    public ResponseEntity<List<ReportTransactionResponse>> getTransactions() {
-        return ResponseEntity.ok(reportService.getTransactions(getLoggedInMerchant()));
+    public ResponseEntity<org.springframework.data.domain.Page<ReportTransactionResponse>> getTransactions(
+            org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(reportService.getTransactions(getLoggedInMerchant(), pageable));
     }
 
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportTransactionsToExcel() {
-        List<ReportTransactionResponse> transactions = reportService.getTransactions(getLoggedInMerchant());
+        // For export, we still want all transactions
+        List<ReportTransactionResponse> transactions = reportService.getAllTransactions(getLoggedInMerchant());
         byte[] excelFile = excelExportService.exportToExcel(transactions);
 
         return ResponseEntity.ok()
@@ -57,14 +59,30 @@ public class ReportController {
                 .body(excelFile);
     }
 
+    @GetMapping("/balance-sheet/export")
+    public ResponseEntity<byte[]> exportBalanceSheetToExcel() {
+        BalanceSheetResponse bs = balanceSheetService.generateBalanceSheet(getLoggedInMerchant());
+        byte[] excelFile = excelExportService.exportBalanceSheet(bs);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=balance_sheet.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelFile);
+    }
+
     @PostMapping("/email")
     public ResponseEntity<String> sendReportViaEmail() {
         MerchantProfile merchant = getLoggedInMerchant();
-        List<ReportTransactionResponse> transactions = reportService.getTransactions(merchant);
+        List<ReportTransactionResponse> transactions = reportService.getAllTransactions(merchant);
         byte[] excelFile = excelExportService.exportToExcel(transactions);
         
         reportEmailService.sendReportEmail(merchant, excelFile);
         
         return ResponseEntity.ok("Report email initiated successfully");
+    }
+
+    @GetMapping("/payment-methods")
+    public ResponseEntity<java.util.Map<String, Long>> getPaymentMethods() {
+        return ResponseEntity.ok(reportService.getPaymentMethods(getLoggedInMerchant()));
     }
 }

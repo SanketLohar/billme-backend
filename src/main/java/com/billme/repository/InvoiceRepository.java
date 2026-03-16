@@ -23,6 +23,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     // Merchant invoice fetch
     List<Invoice> findByMerchant_User_Id(Long userId);
 
+    org.springframework.data.domain.Page<Invoice> findByMerchant_User_Id(
+            Long userId, 
+            org.springframework.data.domain.Pageable pageable
+    );
+
     Optional<Invoice> findByIdAndMerchant_User_Id(Long invoiceId, Long userId);
 
     List<Invoice> findByMerchant_User_IdAndStatus(

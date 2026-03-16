@@ -111,10 +111,15 @@ async function loadDashboard() {
         const data = await window.API.admin.getDashboard();
         
         // Update Stat Cards
-        document.getElementById('count-merchants').innerText = data.totalMerchants || 0;
-        document.getElementById('count-customers').innerText = data.totalCustomers || 0;
-        document.getElementById('count-txns').innerText = data.totalTransactions || 0;
-        document.getElementById('platform-revenue').innerText = '₹' + (data.totalRevenue || 0).toLocaleString();
+        const mEl = document.getElementById('count-merchants');
+        const cEl = document.getElementById('count-customers');
+        const tEl = document.getElementById('count-txns');
+        const rEl = document.getElementById('platform-revenue');
+
+        if (mEl) mEl.innerText = data.totalMerchants || 0;
+        if (cEl) cEl.innerText = data.totalCustomers || 0;
+        if (tEl) tEl.innerText = data.totalTransactions || 0;
+        if (rEl) rEl.innerText = '₹' + (data.totalRevenue || 0).toLocaleString();
 
         // Update Activity Table
         renderActivity(data.recentActivity || []);
@@ -138,10 +143,10 @@ async function loadMerchants() {
         
         body.innerHTML = merchants.map(m => `
             <tr>
-                <td><strong>${m.businessName}</strong></td>
-                <td>${m.ownerName}</td>
-                <td>${m.email}</td>
-                <td><span class="badge badge-${m.active ? 'success' : 'warning'}">${m.active ? 'Active' : 'Pending'}</span></td>
+                <td><strong>${m.businessName || 'Business'}</strong></td>
+                <td>${m.ownerName || 'Owner'}</td>
+                <td>${m.user ? (m.user.email || '—') : '—'}</td>
+                <td><span class="badge badge-${m.profileCompleted ? 'success' : 'warning'}">${m.profileCompleted ? 'Active' : 'Pending'}</span></td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary" onclick="viewMerchant('${m.id}')">View</button>
                 </td>
@@ -163,11 +168,11 @@ async function loadCustomers() {
         
         body.innerHTML = customers.map(c => `
             <tr>
-                <td><code>${c.id}</code></td>
-                <td>${c.fullName || c.username}</td>
-                <td>${c.email}</td>
+                <td><code>${c.id || '—'}</code></td>
+                <td>${c.name || (c.user ? c.user.email : 'Customer')}</td>
+                <td>${c.user ? (c.user.email || '—') : '—'}</td>
                 <td>₹${(c.totalSpent || 0).toFixed(2)}</td>
-                <td>${new Date(c.createdAt).toLocaleDateString()}</td>
+                <td>${c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'}</td>
             </tr>
         `).join('') || '<tr><td colspan="5" class="text-center">No customers found</td></tr>';
 
@@ -184,17 +189,22 @@ async function loadTransactions() {
         const txns = await window.API.admin.getTransactions();
         const body = document.getElementById('transactionsTableBody');
         
-        body.innerHTML = txns.map(t => `
+        body.innerHTML = txns.map(t => {
+            const invoice = t.invoice || {};
+            const merchant = invoice.merchant || {};
+            const customer = invoice.customer || {};
+
+            return `
             <tr>
-                <td><code>#${t.id}</code></td>
-                <td class="fw-600 text-primary">₹${t.amount.toFixed(2)}</td>
-                <td><span class="badge badge-info">${t.paymentMethod}</span></td>
-                <td>${t.merchantName}</td>
-                <td>${t.customerName}</td>
-                <td><span class="badge badge-${t.status === 'SUCCESS' ? 'success' : 'warning'}">${t.status}</span></td>
-                <td>${new Date(t.timestamp || t.createdAt).toLocaleString()}</td>
-            </tr>
-        `).join('') || '<tr><td colspan="7" class="text-center">No transactions recorded</td></tr>';
+                <td><code>#${t.id || '—'}</code></td>
+                <td class="fw-600 text-primary">₹${(t.amount || 0).toFixed(2)}</td>
+                <td><span class="badge badge-info">${invoice.paymentMethod || t.transactionType || '—'}</span></td>
+                <td>${merchant.businessName || 'Admin'}</td>
+                <td>${customer.fullName || customer.username || 'Platform'}</td>
+                <td><span class="badge badge-${t.status === 'SUCCESS' ? 'success' : 'warning'}">${t.status || 'PENDING'}</span></td>
+                <td>${t.createdAt ? new Date(t.createdAt).toLocaleString() : '—'}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="7" class="text-center">No transactions recorded</td></tr>';
 
     } catch (err) {
         showToast('Failed to load transactions', 'error');

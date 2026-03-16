@@ -34,8 +34,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindProfileForm();
     bindProductForm();
     bindInvoiceForm();
-    bindTransactions();
     bindMisc();
+
+    // Export global functions heavily used by row buttons
+    window.previewInvoice = previewInvoice;
+    window.downloadInvoicePdf = downloadInvoicePdf;
+    window.deleteProduct = deleteProduct;
+    window.approveRefund = approveRefund;
+    window.rejectRefund = rejectRefund;
+
+    if (window.applyTranslations) {
+        const lang = localStorage.getItem('billme_lang') || 'en';
+        window.applyTranslations(lang);
+    }
 });
 
 async function loadDashboard() {
@@ -54,9 +65,9 @@ async function loadDashboard() {
         invoiceList = invoices || [];
 
         renderSidebar(profile);
-        renderStatCards(productList, invoiceList, balanceSheet, wallet);
         renderProfileBanner(profile);
         populateProfile(profile);
+        renderStatCards(productList, invoiceList, balanceSheet, wallet);
         renderCharts(invoiceList, paymentMethods);
         renderProducts();
         renderInvoices();
@@ -72,42 +83,86 @@ async function loadDashboard() {
 // ── Sidebar data ─────────────────────────────────────────────
 function renderSidebar(profile) {
     if (!profile) return;
-    document.getElementById('sb-name').textContent = profile.businessName || 'Merchant';
-    document.getElementById('sb-email').textContent = profile.ownerName || '';
-    document.getElementById('sb-upi').textContent = profile.upiId || 'Not set';
-    document.getElementById('topbarAvatar').textContent =
-        (profile.businessName || 'M')[0].toUpperCase();
-
+    const sbName = document.getElementById('sb-name');
+    const sbEmail = document.getElementById('sb-email');
+    const sbUpi = document.getElementById('sb-upi');
+    const topAvatar = document.getElementById('topbarAvatar');
     const badge = document.getElementById('sb-badge');
-    if (profile.profileCompleted) {
-        badge.textContent = 'Profile Complete';
-        badge.className = 'profile-badge complete';
-        badge.setAttribute('data-i18n', 'dash_status_complete');
-    } else {
-        badge.textContent = 'Profile Incomplete';
-        badge.className = 'profile-badge incomplete';
-        badge.setAttribute('data-i18n', 'dash_status_incomplete');
+
+    if (sbName) sbName.textContent = profile.businessName || 'Merchant';
+    if (sbEmail) sbEmail.textContent = profile.ownerName || '';
+    if (sbUpi) sbUpi.textContent = profile.upiId || 'Not set';
+    if (topAvatar) topAvatar.textContent = (profile.businessName || 'M')[0].toUpperCase();
+
+    if (badge) {
+        if (profile.profileCompleted) {
+            badge.textContent = 'Profile Completed';
+            badge.className = 'profile-badge complete';
+            badge.setAttribute('data-i18n', 'dash_status_complete');
+        } else {
+            badge.textContent = 'Incomplete';
+            badge.className = 'profile-badge incomplete';
+            badge.setAttribute('data-i18n', 'dash_status_incomplete');
+        }
     }
-    // Re-apply translations for dynamic badge
-    if (window.applyTranslations) {
-        const lang = localStorage.getItem('billme_lang') || 'en';
-        window.applyTranslations(lang);
+}
+
+function renderProfileBanner(profile) {
+    const banner = document.getElementById('profileBanner');
+    if (!banner) return;
+    if (profile && profile.profileCompleted) {
+        banner.style.display = 'none';
+    } else {
+        banner.style.display = 'flex';
     }
 }
 
 // ── Stat cards (real data from balance sheet & wallet) ─────────
 function renderStatCards(products, invoices, balanceSheet, wallet) {
     const revenue = balanceSheet ? balanceSheet.totalRevenue : 0;
-    const balance = wallet ? wallet.balance : 0;
-    const escrow = wallet ? wallet.escrowBalance : 0;
+    const balance = wallet ? (wallet.currentBalance || wallet.balance || 0) : 0;
+    const escrow = wallet ? (wallet.escrowBalance || 0) : 0;
+    const withdrawals = wallet ? (wallet.totalWithdrawn || 0) : 0;
+    const fees = wallet ? (wallet.platformFee || 0) : 0;
 
-    document.getElementById('stat-revenue').textContent = `₹${(revenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-    document.getElementById('stat-balance').textContent = `₹${(balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-    document.getElementById('stat-escrow').textContent = `₹${(escrow || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-    document.getElementById('stat-products').textContent = products.length;
-    document.getElementById('stat-invoices').textContent = invoices.length;
+    const revEl = document.getElementById('stat-revenue');
+    const balEl = document.getElementById('stat-balance');
+    const escEl = document.getElementById('stat-escrow');
+    const prodEl = document.getElementById('stat-products');
+    const invEl = document.getElementById('stat-invoices');
 
-    // Remove "Awaiting" messages if there is activity
+    if (revEl) revEl.textContent = `₹${(revenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (balEl) balEl.textContent = `₹${(balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (escEl) escEl.textContent = `₹${(escrow || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (prodEl) prodEl.textContent = products ? products.length : 0;
+    if (invEl) invEl.textContent = invoices ? invoices.length : 0;
+
+    // Update Balance Sheet Section
+    const bsRev = document.getElementById('bs-revenue');
+    const bsEsc = document.getElementById('bs-escrow');
+    const bsWd = document.getElementById('bs-withdrawals');
+    const bsFees = document.getElementById('bs-fees');
+    
+    if (bsRev) bsRev.textContent = `₹${(revenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (bsEsc) bsEsc.textContent = `₹${(escrow || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (bsWd) bsWd.textContent = `₹${(withdrawals || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (bsFees) bsFees.textContent = `₹${(fees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+    const bstRev = document.getElementById('bst-rev');
+    const bstEsc = document.getElementById('bst-escrow');
+    const bstWd = document.getElementById('bst-wd');
+    const bstFees = document.getElementById('bst-fees');
+    const bstNet = document.getElementById('bst-net');
+    
+    if (bstRev) bstRev.textContent = (revenue || 0).toFixed(2);
+    if (bstEsc) bstEsc.textContent = (escrow || 0).toFixed(2);
+    if (bstWd) bstWd.textContent = (withdrawals || 0).toFixed(2);
+    if (bstFees) bstFees.textContent = (fees || 0).toFixed(2);
+    if (bstNet) {
+        const net = revenue + escrow - withdrawals - fees;
+        bstNet.textContent = net.toFixed(2);
+    }
+
     if (balance > 0 || escrow > 0 || revenue > 0) {
         document.querySelectorAll('.financial-pending').forEach(el => el.style.display = 'none');
     } else {
@@ -127,9 +182,9 @@ function renderCharts(invoices, paymentMethods) {
 
     // Payment method distribution from API
     const methodCounts = {
-        UPI: paymentMethods.upi || 0,
-        FacePay: paymentMethods.facepay || 0,
-        Card: paymentMethods.card || 0
+        UPI: paymentMethods.UPI || 0,
+        FacePay: paymentMethods.FACE_PAY || 0,
+        Card: paymentMethods.CARD || 0
     };
 
     // Monthly activity
@@ -206,12 +261,17 @@ function renderCharts(invoices, paymentMethods) {
 // ── Profile form ─────────────────────────────────────────────
 function populateProfile(profile) {
     if (!profile) return;
-    const f = ['email', 'businessName', 'ownerName', 'phone', 'address', 'city', 'state', 'pinCode',
+    const fields = ['email', 'businessName', 'ownerName', 'phone', 'address', 'city', 'state', 'pinCode',
         'upiId', 'bankName', 'accountHolderName', 'accountNumber', 'ifscCode'];
-    f.forEach(k => {
+    
+    fields.forEach(k => {
         const el = document.getElementById(`p-${k}`);
-        if (el) el.value = profile[k] || '';
+        if (el) {
+            el.value = profile[k] || '';
+            if (profile.profileCompleted) el.disabled = true;
+        }
     });
+
     const gstEl = document.getElementById('p-gstRegistered');
     if (gstEl) {
         gstEl.checked = !!profile.gstRegistered;
@@ -224,8 +284,7 @@ function populateProfile(profile) {
 }
 
 function updateProfileSectionStatuses(profile) {
-    const contactOk = profile && profile.phone && profile.address && profile.city && profile.state && profile.pinCode;
-    const bankOk = profile && profile.bankName && profile.accountNumber && profile.ifscCode;
+    const isCompleted = profile && profile.profileCompleted;
 
     const lang = localStorage.getItem('billme_lang') || 'en';
     const dict = typeof translations !== 'undefined' ? (translations[lang] || translations.en) : null;
@@ -234,12 +293,12 @@ function updateProfileSectionStatuses(profile) {
     const bSt = document.getElementById('psc-bank-status');
     
     if (cSt) { 
-        cSt.textContent = dict ? (contactOk ? dict.dash_status_complete : dict.dash_status_incomplete) : (contactOk ? 'Complete' : 'Incomplete'); 
-        cSt.className = `psc-status${contactOk ? ' ok' : ''}`; 
+        cSt.textContent = dict ? (isCompleted ? dict.dash_status_complete : dict.dash_status_incomplete) : (isCompleted ? 'Complete' : 'Incomplete'); 
+        cSt.className = `psc-status${isCompleted ? ' ok' : ''}`; 
     }
     if (bSt) { 
-        bSt.textContent = dict ? (bankOk ? dict.dash_status_complete : dict.dash_status_incomplete) : (bankOk ? 'Complete' : 'Incomplete'); 
-        bSt.className = `psc-status${bankOk ? ' ok' : ''}`; 
+        bSt.textContent = dict ? (isCompleted ? dict.dash_status_complete : dict.dash_status_incomplete) : (isCompleted ? 'Complete' : 'Incomplete'); 
+        bSt.className = `psc-status${isCompleted ? ' ok' : ''}`; 
     }
 }
 
@@ -411,11 +470,59 @@ function renderInvoices() {
             <td>${inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString('en-IN') : '—'}</td>
             <td>
                 <button class="action-btn blue" onclick="previewInvoice(${inv.invoiceId})" title="Preview"><i class="fas fa-eye"></i></button>
+                ${inv.status === 'UNPAID' ? `<button class="action-btn orange" onclick="editInvoice(${inv.invoiceId})" title="Edit"><i class="fas fa-edit"></i></button>` : ''}
                 <button class="action-btn green" onclick="downloadInvoicePdf(${inv.invoiceId},'${esc(inv.invoiceNumber || inv.invoiceId)}')" title="Download PDF"><i class="fas fa-download"></i></button>
-                ${inv.status !== 'PAID' ? `<button class="action-btn" onclick="payInvoice(${inv.invoiceId})" title="Pay"><i class="fas fa-credit-card" style="color:#1a73e8;"></i></button>` : ''}
             </td>
         </tr>
     `).join('');
+
+    renderRefundRequests();
+}
+
+function renderRefundRequests() {
+    const tbody = document.getElementById('refundRequestsBody');
+    if (!tbody) return;
+
+    const reqs = invoiceList.filter(inv => inv.status === 'REFUND_REQUESTED');
+    if (!reqs.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:16px;">No pending refund requests.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = reqs.map(inv => `
+        <tr>
+            <td><strong>${esc(inv.invoiceNumber || '#' + inv.invoiceId)}</strong></td>
+            <td>₹${(inv.amount || 0).toFixed(2)}</td>
+            <td>${inv.paymentMethod || '—'}</td>
+            <td>${inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : '—'}</td>
+            <td>
+                <button class="btn btn-success btn-sm" style="margin-right: 5px;" onclick="approveRefund(${inv.invoiceId})">Approve</button>
+                <button class="btn btn-danger btn-sm" onclick="rejectRefund(${inv.invoiceId})">Reject</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function approveRefund(id) {
+    if (!confirm("Are you sure you want to approve this refund and return money to the customer?")) return;
+    try {
+        await API.payment.approveRefund(id);
+        showToast('Refund approved successfully!', 'success');
+        loadDashboard(); // Refresh all data to update balance sheet & state
+    } catch (e) {
+        showToast(e.message || 'Error occurred while approving refund', 'error');
+    }
+}
+
+async function rejectRefund(id) {
+    if (!confirm("Are you sure you want to reject this refund request?")) return;
+    try {
+        await API.payment.rejectRefund(id);
+        showToast('Refund rejected.', 'info');
+        loadDashboard(); // Refresh data
+    } catch (e) {
+        showToast(e.message || 'Error occurred while rejecting refund', 'error');
+    }
 }
 
 function previewInvoice(id) {
@@ -437,6 +544,7 @@ function previewInvoice(id) {
 
     document.getElementById('modalInvBody').innerHTML = `
         <div class="inv-detail-row"><span class="inv-detail-row__label">Invoice #</span><span class="inv-detail-row__val">${inv.invoiceNumber || id}</span></div>
+        <div class="inv-detail-row"><span class="inv-detail-row__label">Customer</span><span class="inv-detail-row__val">${esc(inv.customerName || '—')} (${esc(inv.customerEmail || '—')})</span></div>
         <div class="inv-detail-row"><span class="inv-detail-row__label">Status</span><span class="invoice-status inv-${inv.status}">${inv.status}</span></div>
         <div class="inv-detail-row"><span class="inv-detail-row__label">Issued At</span><span class="inv-detail-row__val">${inv.issuedAt ? new Date(inv.issuedAt).toLocaleString('en-IN') : '—'}</span></div>
         ${inv.paidAt ? `<div class="inv-detail-row"><span class="inv-detail-row__label">Paid At</span><span class="inv-detail-row__val">${new Date(inv.paidAt).toLocaleString('en-IN')}</span></div>` : ''}
@@ -459,9 +567,6 @@ function previewInvoice(id) {
         </div>
     `;
 
-    const payBtn = document.getElementById('modalPayBtn');
-    payBtn.style.display = inv.status === 'PAID' ? 'none' : 'inline-flex';
-
     openModal('invoiceModal');
 }
 
@@ -482,8 +587,9 @@ async function downloadInvoicePdf(id, invNum) {
 }
 
 function payInvoice(id) {
-    closeModal('invoiceModal');
-    window.location.href = `../pay-invoice.html?invoiceId=${id}`;
+    // Merchants cannot pay customer invoices directly from the dashboard anymore.
+    // Preserved method for backward compatibility if any hidden reference exists.
+    showToast("Payment must be initiated by the Customer.", "info");
 }
 
 function bindInvoiceForm() {
@@ -511,8 +617,21 @@ function bindInvoiceForm() {
             downloadInvoicePdf(currentInvId, inv?.invoiceNumber || currentInvId);
         }
     });
-    document.getElementById('modalPayBtn')?.addEventListener('click', () => {
-        if (currentInvId) payInvoice(currentInvId);
+
+    document.getElementById('exportBalanceSheetBtn')?.addEventListener('click', async () => {
+        try {
+            showToast('Generating POI Balance Sheet PDF...', 'info');
+            const blob = await API.wallet.exportBalanceSheet();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `balance_sheet_${new Date().getTime()}.xlsx`;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Excel document exported!', 'success');
+        } catch (e) {
+            showToast(e.message || 'Export failed', 'error');
+        }
     });
 }
 
@@ -619,11 +738,11 @@ async function loadTransactions() {
             const isCredit = tx.direction === 'CREDIT';
             return `
             <tr>
-                <td><code style="font-size:12px;">#${tx.transactionId}</code></td>
+                <td><code style="font-size:12px;">#${tx.transactionId || '—'}</code></td>
                 <td>
                     <span class="badge ${isCredit ? 'badge-success' : 'badge-danger'}">
                         <i class="fas fa-arrow-${isCredit ? 'down' : 'up'}"></i>
-                        ${tx.direction}
+                        ${tx.direction || '—'}
                     </span>
                 </td>
                 <td><strong style="color:${isCredit ? 'var(--secondary)' : 'var(--danger)'};">
@@ -723,6 +842,11 @@ function esc(str) {
 
 // Expose globals used in inline HTML
 window.previewInvoice = previewInvoice;
+window.editInvoice = function(id) {
+    showToast('Invoice editing requires backend PUT API.', 'info');
+};
 window.downloadInvoicePdf = downloadInvoicePdf;
 window.payInvoice = payInvoice;
 window.deleteProduct = deleteProduct;
+window.approveRefund = approveRefund;
+window.rejectRefund = rejectRefund;

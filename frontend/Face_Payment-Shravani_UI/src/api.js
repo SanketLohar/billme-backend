@@ -180,32 +180,31 @@ const API = {
   /* ======================
      MERCHANT
   ====================== */
-
   merchant: {
-
     getProfile: () => apiCall("/api/merchant/profile"),
-
-    updateProfile: (data) => 
+    updateProfile: (data) =>
       apiCall("/api/merchant/profile", {
         method: "PUT",
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       }),
-
     getProducts: () => apiCall("/api/merchant/products"),
-
+    createProduct: (data) =>
+      apiCall("/api/merchant/products", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    deleteProduct: (id) =>
+      apiCall(`/api/merchant/products/${id}`, {
+        method: "DELETE",
+      }),
     getInvoices: () => apiCall("/merchant/invoices"),
-
     createInvoice: (data) =>
       apiCall("/merchant/invoices", {
         method: "POST",
         body: JSON.stringify(data),
       }),
-
-    downloadInvoicePdf: (id) =>
-      apiDownload(`/invoice/${id}/pdf`),
-
+    downloadInvoicePdf: (id) => apiDownload(`/invoice/${id}/pdf`),
     getPaymentMethods: () => apiCall("/api/merchant/reports/payment-methods"),
-
   },
 
   /* ======================
@@ -213,11 +212,9 @@ const API = {
   ====================== */
 
   customer: {
-
     getProfile: () => apiCall("/api/customer/profile"),
-
     getInvoices: () => apiCall("/api/customer/invoices"),
-
+    getPendingInvoices: () => apiCall("/api/customer/invoices/pending"),
   },
 
   /* ======================
@@ -225,13 +222,10 @@ const API = {
   ====================== */
 
   invoice: {
-
     getPreview: (id) =>
       apiCall(`/api/invoices/${id}/preview`),
-
-    getPublic: (invoiceNumber, token) => 
+    getPublic: (invoiceNumber, token) =>
       apiCall(`/public/invoices/${invoiceNumber}?token=${token}`),
-
   },
 
   /* ======================
@@ -239,29 +233,36 @@ const API = {
   ====================== */
 
   payment: {
-
-    createOrder: (invoiceId) => 
+    createOrder: (invoiceId) =>
       apiCall(`/api/payments/create-order/${invoiceId}`, {
-        method: "POST"
+        method: "POST",
       }),
-
     payWithFace: (invoiceId, data) =>
       apiCall(`/customer/invoices/${invoiceId}/pay/face`, {
         method: "POST",
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       }),
-
-    verifyRazorpay: (data) => 
+    verifyRazorpay: (data) =>
       apiCall("/api/payments/verify", {
         method: "POST",
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       }),
-
     refund: (invoiceId) =>
+      apiCall(`/api/refund/${invoiceId}`, {
+        method: "POST",
+      }),
+    requestRefund: (invoiceId) =>
+      apiCall(`/api/refund/request/${invoiceId}`, {
+        method: "POST"
+      }),
+    approveRefund: (invoiceId) =>
       apiCall(`/api/payments/refund/${invoiceId}`, {
         method: "POST"
-      })
-
+      }),
+    rejectRefund: (invoiceId) =>
+      apiCall(`/api/payments/refund/reject/${invoiceId}`, {
+        method: "POST"
+      }),
   },
 
   /* ======================
@@ -269,15 +270,27 @@ const API = {
   ====================== */
 
   wallet: {
-
     getWallet: () => apiCall("/api/merchant/wallet"),
-
     getBalanceSheet: () => apiCall("/api/merchant/reports/balance-sheet"),
-
-    getTransactions: () => apiCall("/api/merchant/reports/transactions"),
-
-    exportTransactions: () => apiDownload("/api/merchant/reports/export")
-
+    getTransactions: (params) => {
+      let query = "";
+      if (params) {
+        const cleanParams = Object.fromEntries(
+          Object.entries(params).filter(([_, v]) => v !== undefined && v !== "")
+        );
+        if (Object.keys(cleanParams).length > 0) {
+          query = "?" + new URLSearchParams(cleanParams).toString();
+        }
+      }
+      return apiCall(`/transactions${query}`);
+    },
+    exportTransactions: () => apiDownload("/api/merchant/reports/export"),
+    exportBalanceSheet: () => apiDownload("/api/merchant/reports/balance-sheet/export"),
+    sendReportEmail: (data) =>
+      apiCall("/api/merchant/reports/email", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
   },
 
   /* ======================
@@ -309,6 +322,15 @@ const API = {
 
     getTransactions: () => apiCall("/api/admin/transactions")
 
+  },
+
+  /* ======================
+     NOTIFICATIONS
+  ====================== */
+
+  notifications: {
+    get: () => apiCall("/api/notifications"),
+    markRead: (id) => apiCall(`/api/notifications/${id}/read`, { method: "POST" })
   }
 
 };

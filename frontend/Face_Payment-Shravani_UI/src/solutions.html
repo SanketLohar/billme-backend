@@ -7,8 +7,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="global.css">
-    <script src="translations.js" defer></script>
-    <script src="i18n.js" defer></script>
+    <!-- <!-- <script src="translations.js" defer></script> --> -->
+   <script src="i18n.js" defer></script>
     <style>
         /* Solutions Specific Styles */
         :root {
@@ -134,10 +134,10 @@
             <div class="language-dropdown-container">
                 <div class="language-switcher" onclick="toggleLangDropdown()">
                     <i class="fas fa-globe"></i>
-                    <span id="currentLang">EN</span>
+                    <span id="current-lang">EN</span>
                     <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                 </div>
-                <div class="language-dropdown" id="langDropdown">
+                <div class="language-dropdown" id="lang-menu">
                     <div class="lang-option" onclick="setLanguage('en')">English (EN)</div>
                     <div class="lang-option" onclick="setLanguage('hi')">हिन्दी (HI)</div>
                     <div class="lang-option" onclick="setLanguage('mr')">मराठी (MR)</div>
@@ -261,35 +261,35 @@
     <div class="footer-inner">
         <div class="footer-grid">
             <div class="footer-col">
-                <h4>BillMe</h4>
-                <p style="color:#bdc1c6;font-size:13px;line-height:1.7;margin-top:8px;">Next-generation billing and digital payment infrastructure for modern Indian businesses.</p>
+                <h4 data-i18n="branding_name">BillMe</h4>
+                <p style="color:#bdc1c6;font-size:13px;line-height:1.7;margin-top:8px;"><span data-i18n="footer_desc">Next-generation billing and digital payment infrastructure for modern Indian businesses.</span></p>
             </div>
             <div class="footer-col">
-                <h4>Platform</h4>
+                <h4 data-i18n="nav_platform">Platform</h4>
                 <ul>
-                    <li><a href="products.html">Products</a></li>
-                    <li><a href="solutions.html">Solutions</a></li>
-                    <li><a href="Industries.html">Industries</a></li>
-                    <li><a href="request_demo.html">Request Demo</a></li>
+                    <li><a href="products.html" data-i18n="nav_products">Products</a></li>
+                    <li><a href="solutions.html" data-i18n="nav_solutions">Solutions</a></li>
+                    <li><a href="Industries.html" data-i18n="nav_industries">Industries</a></li>
+                    <li><a href="request_demo.html" data-i18n="nav_getstarted">Request Demo</a></li>
                 </ul>
             </div>
             <div class="footer-col">
-                <h4>Company</h4>
+                <h4 data-i18n="nav_company">Company</h4>
                 <ul>
-                    <li><a href="company.html">About Us</a></li>
-                    <li><a href="contact.html">Contact</a></li>
-                    <li><a href="#">Careers</a></li>
+                    <li><a href="company.html" data-i18n="nav_aboutus">About Us</a></li>
+                    <li><a href="contact.html" data-i18n="nav_contact">Contact</a></li>
+                    <li><a href="#" data-i18n="nav_careers">Careers</a></li>
                 </ul>
             </div>
             <div class="footer-col">
-                <h4>Legal</h4>
+                <h4 data-i18n="nav_legal">Legal</h4>
                 <ul>
-                    <li><a href="#">Privacy Policy</a></li>
-                    <li><a href="#">Terms of Service</a></li>
+                    <li><a href="#" data-i18n="link_privacy">Privacy Policy</a></li>
+                    <li><a href="#" data-i18n="link_terms">Terms of Service</a></li>
                 </ul>
             </div>
         </div>
-        <div class="footer-copy">© 2025 BillMe · Fintech Merchant Infrastructure · Built for India</div>
+        <div class="footer-copy" data-i18n="footer_copy">© 2025 BillMe · Fintech Merchant Infrastructure · Built for India</div>
     </div>
 </footer>
 <!-- Chatbot -->

@@ -12,7 +12,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="src/global.css">
-    <script src="src/translations.js" defer></script>
     <script src="src/i18n.js" defer></script>
     <style>
         body {
@@ -398,10 +397,10 @@
                 <div class="language-dropdown-container">
                     <div class="language-switcher" onclick="toggleLangDropdown()">
                         <i class="fas fa-globe"></i>
-                        <span id="currentLang">EN</span>
+                        <span id="current-lang">EN</span>
                         <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                     </div>
-                    <div class="language-dropdown" id="langDropdown">
+                    <div class="language-dropdown" id="lang-menu">
                         <div class="lang-option" onclick="setLanguage('en')">English (EN)</div>
                         <div class="lang-option" onclick="setLanguage('hi')">हिन्दी (HI)</div>
                         <div class="lang-option" onclick="setLanguage('mr')">मराठी (MR)</div>
@@ -483,9 +482,10 @@
                     based on your GST
                     registration and buyer's state.</p>
                 <ul>
-                    <li><i class="fas fa-check"></i> Auto GST slab selection (0%, 5%, 12%, 18%, 28%)</li>
-                    <li><i class="fas fa-check"></i> Intra/inter-state tax routing</li>
-                    <li><i class="fas fa-check"></i> Instant PDF generation</li>
+                    <li data-i18n="prod_f1_item1"><i class="fas fa-check"></i> Auto GST slab selection (0%, 5%, 12%,
+                        18%, 28%)</li>
+                    <li data-i18n="prod_f1_item2"><i class="fas fa-check"></i> Intra/inter-state tax routing</li>
+                    <li data-i18n="prod_f1_item3"><i class="fas fa-check"></i> Instant PDF generation</li>
                 </ul>
             </div>
 
@@ -496,9 +496,9 @@
                     ensuring trust between
                     merchant and customer.</p>
                 <ul>
-                    <li><i class="fas fa-check"></i> Dual escrow + balance wallets</li>
-                    <li><i class="fas fa-check"></i> Automated settlement triggers</li>
-                    <li><i class="fas fa-check"></i> Zero fund leakage guarantee</li>
+                    <li data-i18n="prod_f2_item1"><i class="fas fa-check"></i> Dual escrow + balance wallets</li>
+                    <li data-i18n="prod_f2_item2"><i class="fas fa-check"></i> Automated settlement triggers</li>
+                    <li data-i18n="prod_f2_item3"><i class="fas fa-check"></i> Zero fund leakage guarantee</li>
                 </ul>
             </div>
 
@@ -510,9 +510,9 @@
                     checkout. India-first biometric
                     payment experience.</p>
                 <ul>
-                    <li><i class="fas fa-check"></i> Multi-pose face recognition</li>
-                    <li><i class="fas fa-check"></i> 6-pose liveness detection</li>
-                    <li><i class="fas fa-check"></i> Instant POS checkout</li>
+                    <li data-i18n="prod_f3_item1"><i class="fas fa-check"></i> Multi-pose face recognition</li>
+                    <li data-i18n="prod_f3_item2"><i class="fas fa-check"></i> 6-pose liveness detection</li>
+                    <li data-i18n="prod_f3_item3"><i class="fas fa-check"></i> Instant POS checkout</li>
                 </ul>
             </div>
 
@@ -524,9 +524,9 @@
                     physical retail environments.
                 </p>
                 <ul>
-                    <li><i class="fas fa-check"></i> Camera barcode scanning</li>
-                    <li><i class="fas fa-check"></i> Product catalogue management</li>
-                    <li><i class="fas fa-check"></i> Walk-in customer invoicing</li>
+                    <li data-i18n="prod_f4_item1"><i class="fas fa-check"></i> Camera barcode scanning</li>
+                    <li data-i18n="prod_f4_item2"><i class="fas fa-check"></i> Product catalogue management</li>
+                    <li data-i18n="prod_f4_item3"><i class="fas fa-check"></i> Walk-in customer invoicing</li>
                 </ul>
             </div>
 
@@ -538,9 +538,9 @@
                     not estimates or projections.
                 </p>
                 <ul>
-                    <li><i class="fas fa-check"></i> Invoice status breakdown</li>
-                    <li><i class="fas fa-check"></i> Payment method distribution</li>
-                    <li><i class="fas fa-check"></i> Monthly activity trend</li>
+                    <li data-i18n="prod_f5_item1"><i class="fas fa-check"></i> Invoice status breakdown</li>
+                    <li data-i18n="prod_f5_item2"><i class="fas fa-check"></i> Payment method distribution</li>
+                    <li data-i18n="prod_f5_item3"><i class="fas fa-check"></i> Monthly activity trend</li>
                 </ul>
             </div>
 
@@ -551,9 +551,9 @@
                     trail for regulatory
                     compliance.</p>
                 <ul>
-                    <li><i class="fas fa-check"></i> Double-entry accounting</li>
-                    <li><i class="fas fa-check"></i> Full transaction history</li>
-                    <li><i class="fas fa-check"></i> Reconciliation support</li>
+                    <li data-i18n="prod_f6_item1"><i class="fas fa-check"></i> Double-entry accounting</li>
+                    <li data-i18n="prod_f6_item2"><i class="fas fa-check"></i> Full transaction history</li>
+                    <li data-i18n="prod_f6_item3"><i class="fas fa-check"></i> Reconciliation support</li>
                 </ul>
             </div>
 
@@ -660,8 +660,10 @@
             <a href="src/contact.html" data-i18n="nav_contact">Contact</a>
             <a href="src/register.html" data-i18n="nav_getstarted">Sign Up</a>
         </div>
-        <p>© <span id="footerYear">2026</span> BillMe · <span data-i18n="footer_copy">Fintech Merchant Infrastructure ·
-                Built for India</span></p>
+        <p data-i18n="footer_copy">© <span id="footerYear">2026</span> <span data-i18n="branding_name">BillMe</span> ·
+            <span>Fintech Merchant Infrastructure ·
+                Built for India</span>
+        </p>
     </footer>
 
     <script>
@@ -692,11 +694,13 @@
             </div>
         </div>
         <div class="chat-input">
-            <input type="text" placeholder="Type your message..." id="chatInput" data-i18n="chat_placeholder">
+            <input type="text" placeholder="Type your message..." id="chatInput" data-i18n="chat_placeholder"
+                onkeydown="if(event.key === 'Enter') sendMessage()">
             <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
         </div>
     </div>
 
+    <script src="src/api.js"></script>
     <script>
         function toggleChat() {
             document.getElementById('chatWindow').classList.toggle('active');
@@ -724,11 +728,27 @@
             content.scrollTop = content.scrollHeight;
 
             try {
-                // Actual API call
+                // Ensure API is loaded
+                if (!window.API || !window.API.chatbot) {
+                    throw new Error("API client not initialized. Please try refreshing the page.");
+                }
+
+                // Actual API call using centralized client
                 const response = await window.API.chatbot.ask({ question: text });
-                botMsg.innerText = response.answer || "I'm here to help! Could you please clarify your question?";
+
+                if (response && response.answer) {
+                    botMsg.innerText = response.answer;
+                } else {
+                    botMsg.innerText = "I'm here to help! Could you please clarify your question?";
+                }
             } catch (err) {
-                botMsg.innerText = "I'm having trouble connecting to my brain. Please try again later or contact support.";
+                console.error("Chatbot Error:", err);
+                // Informative error message based on the failure
+                if (err.message.includes("Backend not reachable")) {
+                    botMsg.innerText = "Connection lost: I'm unable to reach my servers right now. Please check your internet or try again in a moment.";
+                } else {
+                    botMsg.innerText = `Error: ${err.message || "I'm having trouble connecting to my brain. Please try again later."}`;
+                }
             } finally {
                 content.scrollTop = content.scrollHeight;
             }

@@ -28,4 +28,13 @@ public class MerchantInvoiceController {
     public ResponseEntity<List<CustomerInvoiceResponse>> getInvoices(Authentication authentication) {
         return ResponseEntity.ok(invoiceService.getMerchantInvoices(authentication.getName()));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<String> updateInvoice(
+            @PathVariable Long id,
+            @RequestBody CreateInvoiceRequest request) {
+
+        invoiceService.updateInvoice(id, request);
+        return ResponseEntity.ok("Invoice updated successfully. A new payment link has been sent to the customer.");
+    }
 }

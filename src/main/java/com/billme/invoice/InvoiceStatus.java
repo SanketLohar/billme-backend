@@ -5,5 +5,7 @@ public enum InvoiceStatus {
     PENDING,
     PAID,
     FAILED,
-    REFUNDED
+    REFUNDED,
+    REFUND_REQUESTED,
+    REFUND_REJECTED
 }

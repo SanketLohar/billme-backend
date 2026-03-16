@@ -7,8 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../src/global.css">
-    <script src="../src/translations.js"></script>
-<script src="../src/i18n.js"></script>
+    <script src="../src/i18n.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background: var(--bg); font-family: 'Inter', sans-serif; }
@@ -77,16 +76,26 @@
 
     <main class="main-content">
         <div class="topbar">
-            <div style="font-size:20px; font-weight:700;">Admin Overview</div>
+            <div style="font-size:20px; font-weight:700;" data-i18n="admin_overview_t">Admin Overview</div>
             <div style="display:flex; align-items:center; gap:20px;">
+                <!-- NEW: Notifications Bell -->
+                <div class="notification-container" style="position:relative; margin-right: 16px; cursor: pointer;" id="notificationBell" onclick="toggleNotifications()">
+                    <i class="fas fa-bell" style="font-size: 20px; color: var(--text-secondary);"></i>
+                    <span id="notifBadge" style="display:none; position:absolute; top:-6px; right:-8px; background:var(--danger); color:white; font-size:10px; font-weight:bold; padding:2px 5px; border-radius:10px;">0</span>
+                    <div class="language-dropdown" id="notifDropdown" style="width: 320px; right: 0; padding: 10px; max-height: 400px; overflow-y: auto;">
+                        <h4 style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">Notifications</h4>
+                        <div id="notifList" style="font-size: 13px; color: var(--text-secondary);">Loading...</div>
+                    </div>
+                </div>
+
                 <!-- Language Switcher -->
                 <div class="language-dropdown-container">
                     <div class="language-switcher" onclick="toggleLangDropdown()">
                         <i class="fas fa-globe"></i>
-                        <span id="currentLang">EN</span>
+                        <span id="current-lang">EN</span>
                         <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                     </div>
-                    <div class="language-dropdown" id="langDropdown">
+                    <div class="language-dropdown" id="lang-menu">
                         <div class="lang-option" onclick="setLanguage('en')">English (EN)</div>
                         <div class="lang-option" onclick="setLanguage('hi')">हिन्दी (HI)</div>
                         <div class="lang-option" onclick="setLanguage('mr')">मराठी (MR)</div>
@@ -101,19 +110,19 @@
             <div class="section-page active" id="sec-dashboard">
                 <div class="stat-grid">
                     <div class="stat-card">
-                        <div class="stat-card__label">Total Merchants</div>
+                        <div class="stat-card__label" data-i18n="admin_total_merch">Total Merchants</div>
                         <div class="stat-card__value" id="count-merchants">0</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-card__label">Total Customers</div>
+                        <div class="stat-card__label" data-i18n="admin_total_cust">Total Customers</div>
                         <div class="stat-card__value" id="count-customers">0</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-card__label">Total Transactions</div>
+                        <div class="stat-card__label" data-i18n="admin_total_txns">Total Transactions</div>
                         <div class="stat-card__value" id="count-txns">0</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-card__label">Platform Revenue</div>
+                        <div class="stat-card__label" data-i18n="admin_plat_rev">Platform Revenue</div>
                         <div class="stat-card__value" id="platform-revenue">₹0</div>
                     </div>
                 </div>
@@ -235,6 +244,8 @@
         <span>System Status: <span class="badge badge-success">Healthy</span></span>
     </div>
 </footer>
+
+<div id="toast-container" class="toast-container"></div>
 
 <script src="../src/api.js"></script>
 <script src="admin.js"></script>

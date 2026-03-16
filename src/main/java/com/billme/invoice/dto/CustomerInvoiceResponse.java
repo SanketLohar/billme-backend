@@ -25,4 +25,7 @@ public class CustomerInvoiceResponse {
     private BigDecimal cgstAmount;
     private BigDecimal sgstAmount;
     private BigDecimal igstAmount;
+    private String paymentToken;
+    private String customerName;
+    private String customerEmail;
 }

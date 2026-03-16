@@ -1,64 +1,129 @@
-function applyLanguage(lang = 'en') {
-    if (typeof translations === 'undefined') {
-        console.warn('translations.js not loaded yet');
+/**
+ * BillMe Global I18N Engine
+ * Handles dynamic JSON loading, language persistence, and UI translation.
+ */
+
+window.translations = null;
+
+/**
+ * Determines the base path for i18n files.
+ * Since pages are in / (root), /src/, and /dashboard/, we need to handle paths carefully.
+ */
+function getI18nPath() {
+    const path = window.location.pathname;
+    if (path.includes('/src/') || path.includes('/dashboard/')) {
+        return '../src/i18n/';
+    }
+    return 'src/i18n/';
+}
+
+/**
+ * Fetches the translation JSON for the given language.
+ */
+async function loadTranslations(lang) {
+    const basePath = getI18nPath();
+    try {
+        const response = await fetch(`${basePath}${lang}.json`);
+        if (!response.ok) throw new Error(`Failed to load ${lang}.json`);
+        window.translations = await response.json();
+        console.log(`Translations loaded: ${lang}`);
+        return true;
+    } catch (error) {
+        console.error("I18N Error:", error);
+        return false;
+    }
+}
+
+/**
+ * Updates the UI with translated strings.
+ */
+function applyLanguage(lang) {
+    if (!window.translations) {
+        console.warn("Translations not loaded yet.");
         return;
     }
-    const dict = translations[lang] || translations.en;
-    document.querySelectorAll('[data-i18n]').forEach(el => {
+
+    // Update HTML lang attribute
+    document.documentElement.setAttribute('lang', lang);
+
+    // Update all elements with data-i18n
+    const elements = document.querySelectorAll('[data-i18n]');
+    elements.forEach(el => {
         const key = el.getAttribute('data-i18n');
-        if (dict[key]) {
+        let translation = window.translations[key];
+
+        if (translation) {
+            // Handle placeholders if the element is an input or textarea
             if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-                el.placeholder = dict[key];
+                el.placeholder = translation;
             } else {
-                el.innerText = dict[key];
+                // Preserve icons (fa-* classes) if they exist
+                const icon = el.querySelector('i.fas, i.fab, i.far');
+                if (icon) {
+                    el.innerHTML = '';
+                    el.appendChild(icon);
+                    el.appendChild(document.createTextNode(' ' + translation));
+                } else {
+                    el.innerText = translation;
+                }
             }
         }
     });
 
-    // Explicit placeholder translations
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-        const key = el.getAttribute('data-i18n-placeholder');
-        if (dict[key]) {
-            el.placeholder = dict[key];
-        }
-    });
-
-    // Update active lang in UI if elements exist
-    const currentLangEl = document.getElementById('currentLang');
-    if (currentLangEl) currentLangEl.innerText = lang.toUpperCase();
-
-    // Update HTML lang attribute
-    document.documentElement.lang = lang;
+    // Update Language Switcher Display (e.g., "EN", "HI", "MR")
+    const langLabel = document.getElementById('current-lang');
+    if (langLabel) {
+        langLabel.innerText = lang.toUpperCase();
+    }
 }
 
-window.setLanguage = function(lang) {
+/**
+ * Sets the language, persists it, and updates the UI.
+ */
+window.setLanguage = async function (lang) {
     localStorage.setItem('billme_lang', lang);
-    applyLanguage(lang);
-    // Some pages might need a full reload if they have complex dynamic content 
-    // but for now, DOM replacement is cleaner
-}
+    const success = await loadTranslations(lang);
+    if (success) {
+        applyLanguage(lang);
+    }
 
-window.toggleLangDropdown = function() {
-    const drop = document.getElementById('langDropdown');
-    if (drop) drop.classList.toggle('active');
-}
+    // Auto-close dropdown if it exists
+    const menu = document.getElementById('lang-menu');
+    if (menu) {
+        menu.classList.remove('active');
+    }
+};
 
-document.addEventListener('DOMContentLoaded', () => {
+/**
+ * Toggles the language dropdown menu.
+ */
+window.toggleLangDropdown = function () {
+    const menu = document.getElementById("lang-menu");
+    if (!menu) return;
+
+    menu.classList.toggle("active");
+};
+
+// Global click-out to close dropdown
+document.addEventListener("click", (e) => {
+    const switcher = document.querySelector(".language-switcher");
+    const container = document.querySelector(".language-dropdown-container");
+    const menu = document.getElementById("lang-menu");
+
+    if (!menu || !container) return;
+
+    if (!container.contains(e.target)) {
+        menu.classList.remove("active");
+    }
+});
+
+/**
+ * Initializes translations on page load.
+ */
+document.addEventListener('DOMContentLoaded', async () => {
     const savedLang = localStorage.getItem('billme_lang') || 'en';
-    applyLanguage(savedLang);
-    
-    // Dynamic year for footer
-    const yearEl = document.getElementById('footerYear');
-    if (yearEl) yearEl.innerText = new Date().getFullYear();
-    document.querySelectorAll('.dynamic-year').forEach(el => {
-      el.innerText = new Date().getFullYear();
-    });
-
-    // Handle clicks outside lang dropdown
-    window.onclick = function (event) {
-        if (!event.target.closest('.language-dropdown-container')) {
-            const drop = document.getElementById('langDropdown');
-            if (drop) drop.classList.remove('active');
-        }
+    const success = await loadTranslations(savedLang);
+    if (success) {
+        applyLanguage(savedLang);
     }
 });

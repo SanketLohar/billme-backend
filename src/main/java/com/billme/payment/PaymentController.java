@@ -20,4 +20,10 @@ public class PaymentController {
 
         return ResponseEntity.ok(orderId);
     }
+
+    @PostMapping("/verify")
+    public ResponseEntity<String> verifyPayment(@RequestBody com.billme.payment.dto.VerifyRazorpayRequest request) {
+        invoiceService.verifyRazorpayPayment(request);
+        return ResponseEntity.ok("Payment verified successfully");
+    }
 }

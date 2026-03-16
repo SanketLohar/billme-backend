@@ -27,4 +27,22 @@ public class AdminController {
     public ResponseEntity<AdminFinancialSummaryResponse> getDashboard() {
         return ResponseEntity.ok(adminService.getFinancialSummary());
     }
+
+    @GetMapping("/merchants")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.List<com.billme.merchant.MerchantProfile>> getMerchants() {
+        return ResponseEntity.ok(adminService.getAllMerchants());
+    }
+
+    @GetMapping("/customers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.List<com.billme.customer.CustomerProfile>> getCustomers() {
+        return ResponseEntity.ok(adminService.getAllCustomers());
+    }
+
+    @GetMapping("/transactions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.List<com.billme.transaction.Transaction>> getTransactions() {
+        return ResponseEntity.ok(adminService.getAllTransactions());
+    }
 }
