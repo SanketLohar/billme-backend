@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 @Builder
 public class InvoiceItemResponse {
 
+    private Long productId;
     private String productName;
 
     private BigDecimal unitPrice;

@@ -388,6 +388,7 @@ public class InvoiceService {
                         invoice.getItems().stream()
                                 .map(item ->
                                         InvoiceItemResponse.builder()
+                                                .productId(item.getProduct().getId())
                                                 .productName(item.getProductNameSnapshot())
                                                 .unitPrice(item.getUnitPrice())
                                                 .quantity(item.getQuantity())
@@ -532,6 +533,7 @@ public class InvoiceService {
 
         List<InvoiceItemResponse> items = invoice.getItems().stream()
                 .map(item -> InvoiceItemResponse.builder()
+                        .productId(item.getProduct().getId())
                         .productName(item.getProductNameSnapshot())
                         .unitPrice(item.getUnitPrice())
                         .quantity(item.getQuantity())

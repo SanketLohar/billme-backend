@@ -77,6 +77,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- UPI / Razorpay ---
     document.getElementById('btn-upi')?.addEventListener('click', async () => {
         const btn = document.getElementById('btn-upi');
+        if (!currentInvoice || !currentInvoice.totalPayable) {
+            showToast('Invoice details not loaded correctly', 'error');
+            return;
+        }
+
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
@@ -85,14 +90,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const orderId = await window.API.payment.createOrder(currentInvoice.id);
 
             const options = {
-                key: 'rzp_test_dummy_key', // This would be dynamic in production
-                amount: currentInvoice.totalPayable * 100,
+                key: 'rzp_test_SIgyziHVJLgRT2', // Correct test key from application.properties
+                amount: Math.round(currentInvoice.totalPayable * 100), // Ensure paise is an integer
                 currency: "INR",
                 name: "BillMe Payment",
                 description: `Invoice ${currentInvoice.invoiceNumber}`,
                 order_id: orderId,
                 handler: async function (response) {
-                    // In a real app, we verify on backend
                     try {
                         await window.API.payment.verifyRazorpay({
                             razorpay_payment_id: response.razorpay_payment_id,
@@ -101,7 +105,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                         });
                         showSuccess();
                     } catch (e) {
-                        showToast('Payment verification failed', 'error');
+                        showToast('Payment verification failed: ' + (e.message || 'Check connection'), 'error');
+                    }
+                },
+                modal: {
+                    ondismiss: function() {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-qrcode"></i> UPI / Card';
                     }
                 },
                 theme: { color: "#1a73e8" }
@@ -110,7 +120,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             rzp.open();
         } catch (err) {
             showToast(err.message || 'Payment initiation failed', 'error');
-        } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-qrcode"></i> UPI / Card';
         }

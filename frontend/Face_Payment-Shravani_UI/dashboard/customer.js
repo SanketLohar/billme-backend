@@ -135,7 +135,7 @@ function renderInvoices(invoices) {
         if (status === 'REFUND_REQUESTED') statusBadgeClass = 'info';
         if (status === 'FAILED') statusBadgeClass = 'danger';
 
-        let actionsHtml = `<button class="btn btn-secondary btn-sm" onclick="previewInvoice('${invoiceId}')" title="Preview"><i class="fas fa-eye"></i></button>`;
+        let actionsHtml = `<button class="btn btn-secondary btn-sm" onclick="previewInvoice('${inv.invoiceNumber}', '${inv.paymentToken}')" title="Preview"><i class="fas fa-eye"></i></button>`;
         
         if (status === 'UNPAID') {
             actionsHtml += `<button class="btn btn-primary btn-sm" onclick="payInvoice('${inv.invoiceNumber}', '${inv.paymentToken}')">Pay Now</button>`;
@@ -183,9 +183,9 @@ function updateAnalytics(invoices) {
 }
 
 // Global actions exposed to window
-window.previewInvoice = function(invoiceId) {
-    if (!invoiceId || invoiceId === 'undefined') return;
-    window.location.href = `../pay-invoice.html?id=${invoiceId}`;
+window.previewInvoice = function(num, token) {
+    if (!num || !token) return;
+    window.location.href = `../pay-invoice.html?num=${num}&token=${token}`;
 };
 
 window.downloadInvoice = async function(invoiceId) {

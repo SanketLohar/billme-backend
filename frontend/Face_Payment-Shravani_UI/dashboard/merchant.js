@@ -469,7 +469,8 @@ function renderInvoices() {
             <td>${inv.paymentMethod || '<span class="text-muted">—</span>'}</td>
             <td>${inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString('en-IN') : '—'}</td>
             <td>
-                <button class="action-btn blue" onclick="previewInvoice(${inv.invoiceId})" title="Preview"><i class="fas fa-eye"></i></button>
+                <button class="action-btn blue" onclick="previewInvoice(${inv.invoiceId})" title="View Details"><i class="fas fa-info-circle"></i></button>
+                <button class="action-btn purple" onclick="copyPaymentLink('${inv.invoiceNumber}', '${inv.paymentToken}')" title="Copy Payment Link"><i class="fas fa-copy"></i></button>
                 ${inv.status === 'UNPAID' ? `<button class="action-btn orange" onclick="editInvoice(${inv.invoiceId})" title="Edit"><i class="fas fa-edit"></i></button>` : ''}
                 <button class="action-btn green" onclick="downloadInvoicePdf(${inv.invoiceId},'${esc(inv.invoiceNumber || inv.invoiceId)}')" title="Download PDF"><i class="fas fa-download"></i></button>
             </td>
@@ -643,23 +644,44 @@ function renderInvoiceItemRow() {
     row.innerHTML = `
         <div class="form-group mb-0">
             <label class="form-label">Product</label>
-            <select class="form-input inv-prod-select">
+            <select class="form-input inv-prod-select" onchange="updateRowPrice(this)">
                 <option value="">— Select —</option>
                 ${productList.map(p => `<option value="${p.id}" data-price="${p.price}" data-gst="${p.gstRate || 0}">${esc(p.name)} (₹${p.price})</option>`).join('')}
             </select>
         </div>
         <div class="form-group mb-0">
             <label class="form-label">Qty</label>
-            <input type="number" class="form-input inv-qty" value="1" min="1">
+            <input type="number" class="form-input inv-qty" value="1" min="1" onchange="calculateDraftTotal()">
         </div>
         <div class="form-group mb-0">
-            <label class="form-label">Unit Price</label>
-            <input type="number" class="form-input inv-unit-price" step="0.01">
+            <label class="form-label">Unit Price (Auto)</label>
+            <div class="form-input inv-unit-price-display" style="background:#f1f3f4; font-weight:600;">₹0.00</div>
+            <input type="hidden" class="inv-unit-price" value="0">
         </div>
-        <button type="button" class="btn btn-danger btn-sm" style="margin-bottom:20px;" onclick="this.closest('.grid-2').remove()"><i class="fas fa-times"></i></button>
+        <button type="button" class="btn btn-danger btn-sm" style="margin-bottom:20px;" onclick="this.closest('.grid-2').remove(); calculateDraftTotal();"><i class="fas fa-times"></i></button>
     `;
     container.appendChild(row);
 }
+
+window.updateRowPrice = function(sel) {
+    const row = sel.closest('.grid-2');
+    const price = parseFloat(sel.selectedOptions[0]?.dataset.price || 0);
+    const display = row.querySelector('.inv-unit-price-display');
+    const hidden = row.querySelector('.inv-unit-price');
+    if (display) display.textContent = `₹${price.toFixed(2)}`;
+    if (hidden) hidden.value = price;
+    calculateDraftTotal();
+};
+
+window.calculateDraftTotal = function() {
+    let total = 0;
+    document.querySelectorAll('#inv-items-container .grid-2').forEach(row => {
+        const qty = parseInt(row.querySelector('.inv-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.inv-unit-price').value) || 0;
+        total += qty * price;
+    });
+    // Optional: show a live draft total somewhere if UI has it
+};
 
 async function submitInvoice() {
     const custEmail = document.getElementById('inv-custEmail').value.trim();
@@ -670,9 +692,9 @@ async function submitInvoice() {
     itemRows.forEach(row => {
         const sel = row.querySelector('.inv-prod-select');
         const qty = parseInt(row.querySelector('.inv-qty').value) || 1;
-        const price = parseFloat(row.querySelector('.inv-unit-price').value);
+        // Backend DTO: productId, barcode, quantity. unitPrice is NOT in DTO.
         if (sel.value) {
-            items.push({ productId: parseInt(sel.value), quantity: qty, unitPrice: price || parseFloat(sel.selectedOptions[0]?.dataset.price || 0) });
+            items.push({ productId: parseInt(sel.value), quantity: qty });
         }
     });
 
@@ -680,22 +702,34 @@ async function submitInvoice() {
     if (!items.length) { showToast('Add at least one item', 'warning'); return; }
 
     const btn = document.getElementById('submitInvoiceBtn');
-    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    const isEditing = !!currentInvId;
+    btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${isEditing ? 'Updating' : 'Creating'}...`;
 
     try {
         const payload = { customerEmail: custEmail, customerName: custName || null, items };
-        await API.merchant.createInvoice(payload);
+        
+        if (isEditing) {
+            await apiCall(`/merchant/invoices/${currentInvId}`, {
+                method: "PUT",
+                body: JSON.stringify(payload)
+            });
+            showToast('Invoice updated and new link sent!', 'success');
+        } else {
+            await API.merchant.createInvoice(payload);
+            showToast('Invoice created!', 'success');
+        }
+
         invoiceList = await API.merchant.getInvoices().catch(() => invoiceList);
         renderInvoices();
         renderCharts(invoiceList);
         document.getElementById('stat-invoices').textContent = invoiceList.length;
         document.getElementById('invoiceListCard').style.display = 'block';
         document.getElementById('createInvoiceForm').style.display = 'none';
-        showToast('Invoice created!', 'success');
+        currentInvId = null; // reset
     } catch (e) {
-        showToast(e.message || 'Failed to create invoice', 'error');
+        showToast(e.message || 'Action failed', 'error');
     } finally {
-        btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Create Invoice';
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> ' + (isEditing ? 'Update Invoice' : 'Create Invoice');
     }
 }
 
@@ -843,7 +877,73 @@ function esc(str) {
 // Expose globals used in inline HTML
 window.previewInvoice = previewInvoice;
 window.editInvoice = function(id) {
-    showToast('Invoice editing requires backend PUT API.', 'info');
+    const inv = invoiceList.find(i => i.invoiceId === id);
+    if (!inv) return;
+    if (inv.status !== 'UNPAID') {
+        showToast('Only UNPAID invoices can be edited.', 'warning');
+        return;
+    }
+    currentInvId = id;
+    
+    // Switch to form
+    document.getElementById('invoiceListCard').style.display = 'none';
+    const form = document.getElementById('createInvoiceForm');
+    form.style.display = 'block';
+    form.querySelector('h3').textContent = `Edit Invoice ${inv.invoiceNumber || '#' + id}`;
+    document.getElementById('submitInvoiceBtn').innerHTML = '<i class="fas fa-save"></i> Update Invoice';
+
+    // Populate
+    document.getElementById('inv-custEmail').value = inv.customerEmail || '';
+    document.getElementById('inv-custName').value = inv.customerName || '';
+    
+    const container = document.getElementById('inv-items-container');
+    container.innerHTML = '';
+    
+    if (inv.items && inv.items.length) {
+        inv.items.forEach(item => {
+            // Find matching product in productList by name snapshot or we might need productId from backend
+            // For now, let's assume we can match by name or fallback. 
+            // Better: backend CustomerInvoiceResponse should probably include productId.
+            // Let's check CustomerInvoiceResponse.java
+            renderInvoiceItemRow();
+            const row = container.lastElementChild;
+            const sel = row.querySelector('.inv-prod-select');
+            
+            // Better matching using productId
+            if (item.productId) {
+                sel.value = item.productId;
+            } else {
+                // Fallback for legacy items
+                for (let opt of sel.options) {
+                    if (opt.text.startsWith(item.productName)) {
+                        sel.value = opt.value;
+                        break;
+                    }
+                }
+            }
+            row.querySelector('.inv-qty').value = item.quantity || 1;
+            updateRowPrice(sel);
+        });
+    } else {
+        renderInvoiceItemRow();
+    }
+};
+window.copyPaymentLink = function(num, token) {
+    if (!num || !token) {
+        showToast('Cannot generate link for this invoice', 'warning');
+        return;
+    }
+    const link = `${window.location.origin}/frontend/Face_Payment-Shravani_UI/pay-invoice.html?num=${num}&token=${token}`;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(() => {
+            showToast('Payment link copied to clipboard!', 'success');
+        }).catch(() => {
+            prompt("Copy payment link:", link);
+        });
+    } else {
+        prompt("Copy payment link:", link);
+    }
 };
 window.downloadInvoicePdf = downloadInvoicePdf;
 window.payInvoice = payInvoice;

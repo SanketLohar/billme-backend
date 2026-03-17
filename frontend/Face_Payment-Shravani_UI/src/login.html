@@ -608,14 +608,15 @@ document.getElementById("loginForm").addEventListener("submit", async function (
            REDIRECT
         ========================= */
 
-        if (window.redirectByRole) {
-            window.redirectByRole();
+        const role = (data.role || "").toLowerCase();
+        if (role === "admin") {
+            window.location.href = "../dashboard/Admin.html";
+        } else if (role === "merchant") {
+            window.location.href = "../dashboard/merchant.html";
+        } else if (role === "customer") {
+            window.location.href = "../dashboard/customer.html";
         } else {
-            const role = (data.role || "").toLowerCase();
-            if (role === "admin") window.location.href = "../dashboard/Admin.html";
-            else if (role === "merchant") window.location.href = "../dashboard/merchant.html";
-            else if (role === "customer") window.location.href = "../dashboard/customer.html";
-            else window.location.href = "../dashboard/merchant.html";
+            window.location.href = "../dashboard/merchant.html";
         }
 
     } catch (err) {
