@@ -23,7 +23,7 @@ let chartStatus = null, chartPayment = null, chartActivity = null;
 // ── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     requireAuth('../src/login.html');
-    
+
     // Dynamic year
     const yearEl = document.getElementById('currentYear');
     if (yearEl) yearEl.textContent = new Date().getFullYear();
@@ -49,6 +49,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// ── Error Handling Utilities ──────────────────────────────────
+function safeErrorMessage(e) {
+    if (!e) return "Unknown error";
+    if (typeof e === "string") return e;
+    if (e.message) return e.message;
+    if (e.error) return e.error;
+    if (typeof e === 'object') {
+        try { return JSON.stringify(e); } catch(s) { return "Something went wrong"; }
+    }
+    return "Something went wrong";
+}
+
+window.addEventListener("error", function (e) {
+    console.error("GLOBAL ERROR:", e.error || e.message);
+});
+
 async function loadDashboard() {
     try {
         const [profile, products, invoices, balanceSheet, wallet, paymentMethods] = await Promise.all([
@@ -57,7 +73,7 @@ async function loadDashboard() {
             API.merchant.getInvoices().catch(() => []),
             API.wallet.getBalanceSheet().catch(() => null),
             API.wallet.getWallet().catch(() => ({ balance: 0, escrowBalance: 0 })),
-            API.merchant.getPaymentMethods().catch(() => ({ upi: 0, facepay: 0, card: 0 }))
+            API.merchant.getPaymentMethods().catch(() => ({ UPI: 0, FACE_PAY: 0, CARD: 0 }))
         ]);
 
         merchantProfile = profile;
@@ -73,36 +89,50 @@ async function loadDashboard() {
         renderInvoices();
 
     } catch (e) {
-        showToast(`Failed to load dashboard: ${e.message}`, 'error');
+        showToast(`Failed to load dashboard: ${safeErrorMessage(e)}`, 'error');
     } finally {
-        document.getElementById('pageLoader').style.display = 'none';
-        document.getElementById('dashLayout').style.display = 'flex';
+        const loader = document.getElementById('pageLoader');
+        const dash = document.getElementById('dashLayout');
+        if (loader) loader.style.display = 'none';
+        if (dash) dash.style.display = 'flex';
     }
 }
 
 // ── Sidebar data ─────────────────────────────────────────────
 function renderSidebar(profile) {
-    if (!profile) return;
+
+    if (!profile) {
+        console.warn("Profile is undefined");
+        return;
+    }
+
     const sbName = document.getElementById('sb-name');
     const sbEmail = document.getElementById('sb-email');
     const sbUpi = document.getElementById('sb-upi');
     const topAvatar = document.getElementById('topbarAvatar');
     const badge = document.getElementById('sb-badge');
 
-    if (sbName) sbName.textContent = profile.businessName || 'Merchant';
-    if (sbEmail) sbEmail.textContent = profile.ownerName || '';
-    if (sbUpi) sbUpi.textContent = profile.upiId || 'Not set';
-    if (topAvatar) topAvatar.textContent = (profile.businessName || 'M')[0].toUpperCase();
+    // ✅ SAFE ACCESS EVERYWHERE
+    const businessName = profile?.businessName || 'Merchant';
+    const ownerName = profile?.ownerName || '';
+    const upiId = profile?.upiId || 'Not set';
+    const isComplete = profile?.profileCompleted === true;
+
+    if (sbName) sbName.textContent = businessName;
+    if (sbEmail) sbEmail.textContent = ownerName;
+    if (sbUpi) sbUpi.textContent = upiId;
+
+    if (topAvatar) {
+        topAvatar.textContent = businessName.charAt(0).toUpperCase();
+    }
 
     if (badge) {
-        if (profile.profileCompleted) {
+        if (isComplete) {
             badge.textContent = 'Profile Completed';
             badge.className = 'profile-badge complete';
-            badge.setAttribute('data-i18n', 'dash_status_complete');
         } else {
             badge.textContent = 'Incomplete';
             badge.className = 'profile-badge incomplete';
-            badge.setAttribute('data-i18n', 'dash_status_incomplete');
         }
     }
 }
@@ -142,7 +172,7 @@ function renderStatCards(products, invoices, balanceSheet, wallet) {
     const bsEsc = document.getElementById('bs-escrow');
     const bsWd = document.getElementById('bs-withdrawals');
     const bsFees = document.getElementById('bs-fees');
-    
+
     if (bsRev) bsRev.textContent = `₹${(revenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
     if (bsEsc) bsEsc.textContent = `₹${(escrow || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
     if (bsWd) bsWd.textContent = `₹${(withdrawals || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
@@ -153,7 +183,7 @@ function renderStatCards(products, invoices, balanceSheet, wallet) {
     const bstWd = document.getElementById('bst-wd');
     const bstFees = document.getElementById('bst-fees');
     const bstNet = document.getElementById('bst-net');
-    
+
     if (bstRev) bstRev.textContent = (revenue || 0).toFixed(2);
     if (bstEsc) bstEsc.textContent = (escrow || 0).toFixed(2);
     if (bstWd) bstWd.textContent = (withdrawals || 0).toFixed(2);
@@ -180,11 +210,11 @@ function renderCharts(invoices, paymentMethods) {
         else statusCounts.UNPAID++;
     });
 
-    // Payment method distribution from API
+    // Payment method distribution from API (SAFE ACCESS)
     const methodCounts = {
-        UPI: paymentMethods.UPI || 0,
-        FacePay: paymentMethods.FACE_PAY || 0,
-        Card: paymentMethods.CARD || 0
+        UPI: paymentMethods?.UPI || paymentMethods?.upi || 0,
+        FacePay: paymentMethods?.FACE_PAY || paymentMethods?.facepay || 0,
+        Card: paymentMethods?.CARD || paymentMethods?.card || 0
     };
 
     // Monthly activity
@@ -263,12 +293,27 @@ function populateProfile(profile) {
     if (!profile) return;
     const fields = ['email', 'businessName', 'ownerName', 'phone', 'address', 'city', 'state', 'pinCode',
         'upiId', 'bankName', 'accountHolderName', 'accountNumber', 'ifscCode'];
-    
+
     fields.forEach(k => {
         const el = document.getElementById(`p-${k}`);
-        if (el) {
-            el.value = profile[k] || '';
-            if (profile.profileCompleted) el.disabled = true;
+        if (!el) return;
+
+        el.value = profile[k] || '';
+
+        const nonEditableFields = ["email", "businessName"];
+        const bankLockedFields = ["accountNumber", "ifscCode"];
+
+        const hasValue = profile[k] !== null && profile[k] !== '';
+
+        if (nonEditableFields.includes(k)) {
+            el.disabled = true;
+        }
+        // 🔐 lock bank fields ONLY if already filled
+        else if (bankLockedFields.includes(k) && hasValue) {
+            el.disabled = true;
+        }
+        else {
+            el.disabled = false;
         }
     });
 
@@ -291,14 +336,14 @@ function updateProfileSectionStatuses(profile) {
 
     const cSt = document.getElementById('psc-contact-status');
     const bSt = document.getElementById('psc-bank-status');
-    
-    if (cSt) { 
-        cSt.textContent = dict ? (isCompleted ? dict.dash_status_complete : dict.dash_status_incomplete) : (isCompleted ? 'Complete' : 'Incomplete'); 
-        cSt.className = `psc-status${isCompleted ? ' ok' : ''}`; 
+
+    if (cSt) {
+        cSt.textContent = dict ? (isCompleted ? dict.dash_status_complete : dict.dash_status_incomplete) : (isCompleted ? 'Complete' : 'Incomplete');
+        cSt.className = `psc-status${isCompleted ? ' ok' : ''}`;
     }
-    if (bSt) { 
-        bSt.textContent = dict ? (isCompleted ? dict.dash_status_complete : dict.dash_status_incomplete) : (isCompleted ? 'Complete' : 'Incomplete'); 
-        bSt.className = `psc-status${isCompleted ? ' ok' : ''}`; 
+    if (bSt) {
+        bSt.textContent = dict ? (isCompleted ? dict.dash_status_complete : dict.dash_status_incomplete) : (isCompleted ? 'Complete' : 'Incomplete');
+        bSt.className = `psc-status${isCompleted ? ' ok' : ''}`;
     }
 }
 
@@ -341,7 +386,7 @@ function bindProfileForm() {
             updateProfileSectionStatuses(updated);
             showToast('Profile updated successfully!', 'success');
         } catch (e) {
-            showToast(e.message || 'Failed to save profile', 'error');
+            showToast(safeErrorMessage(e), 'error');
         } finally {
             btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
         }
@@ -431,11 +476,15 @@ async function saveProduct() {
         renderProducts();
         document.getElementById('stat-products').textContent = productList.length;
         document.getElementById('addProductForm').style.display = 'none';
-        ['prod-name', 'prod-price', 'prod-barcode'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('prod-gstRate').value = '0';
+        ['prod-name', 'prod-price', 'prod-barcode'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        const gstSelect = document.getElementById('prod-gstRate');
+        if (gstSelect) gstSelect.value = '0';
         showToast('Product created!', 'success');
     } catch (e) {
-        showToast(e.message || 'Failed to create product', 'error');
+        showToast(safeErrorMessage(e), 'error');
     } finally {
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Product';
     }
@@ -654,7 +703,7 @@ function renderInvoiceItemRow() {
             <input type="number" class="form-input inv-qty" value="1" min="1" onchange="calculateDraftTotal()">
         </div>
         <div class="form-group mb-0">
-            <label class="form-label">Unit Price (Auto)</label>
+            <label class="form-label">Line Total (Auto)</label>
             <div class="form-input inv-unit-price-display" style="background:#f1f3f4; font-weight:600;">₹0.00</div>
             <input type="hidden" class="inv-unit-price" value="0">
         </div>
@@ -663,7 +712,7 @@ function renderInvoiceItemRow() {
     container.appendChild(row);
 }
 
-window.updateRowPrice = function(sel) {
+window.updateRowPrice = function (sel) {
     const row = sel.closest('.grid-2');
     const price = parseFloat(sel.selectedOptions[0]?.dataset.price || 0);
     const display = row.querySelector('.inv-unit-price-display');
@@ -673,63 +722,144 @@ window.updateRowPrice = function(sel) {
     calculateDraftTotal();
 };
 
-window.calculateDraftTotal = function() {
+window.calculateDraftTotal = function () {
     let total = 0;
     document.querySelectorAll('#inv-items-container .grid-2').forEach(row => {
         const qty = parseInt(row.querySelector('.inv-qty').value) || 0;
         const price = parseFloat(row.querySelector('.inv-unit-price').value) || 0;
-        total += qty * price;
+        const lineTotal = qty * price;
+        total += lineTotal;
+
+        const display = row.querySelector('.inv-unit-price-display');
+        if (display) {
+            display.textContent = `₹${lineTotal.toFixed(2)}`;
+        }
     });
     // Optional: show a live draft total somewhere if UI has it
 };
 
 async function submitInvoice() {
-    const custEmail = document.getElementById('inv-custEmail').value.trim();
-    const custName = document.getElementById('inv-custName').value.trim();
+    console.log("🚀 submitInvoice triggered");
+
+    const btn = document.getElementById('submitInvoiceBtn');
+    if (!btn) return;
+
+    const custEmailEl = document.getElementById('inv-custEmail');
+    const custNameEl = document.getElementById('inv-custName');
+    if (!custEmailEl) return;
+
+    const custEmail = custEmailEl.value.trim();
+    const custName = custNameEl ? custNameEl.value.trim() : "";
 
     const itemRows = document.querySelectorAll('#inv-items-container .grid-2');
     const items = [];
+
     itemRows.forEach(row => {
         const sel = row.querySelector('.inv-prod-select');
-        const qty = parseInt(row.querySelector('.inv-qty').value) || 1;
-        // Backend DTO: productId, barcode, quantity. unitPrice is NOT in DTO.
-        if (sel.value) {
-            items.push({ productId: parseInt(sel.value), quantity: qty });
-        }
+        const qtyInput = row.querySelector('.inv-qty');
+        if (!sel || !qtyInput) return;
+
+        const productId = parseInt(sel.value);
+        const qty = parseInt(qtyInput.value);
+
+        if (!productId || isNaN(productId)) return;
+        if (!qty || qty <= 0) return;
+
+        items.push({
+            productId: productId,
+            quantity: qty
+        });
     });
 
-    if (!custEmail) { showToast('Customer email is required', 'warning'); return; }
-    if (!items.length) { showToast('Add at least one item', 'warning'); return; }
+    if (!custEmail) {
+        showToast('Customer email is required', 'warning');
+        return;
+    }
 
-    const btn = document.getElementById('submitInvoiceBtn');
-    const isEditing = !!currentInvId;
-    btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${isEditing ? 'Updating' : 'Creating'}...`;
+    if (items.length === 0) {
+        showToast('Add at least one valid product', 'warning');
+        return;
+    }
+
+    const payload = {
+        customerEmail: custEmail,
+        customerName: custName,
+        items: items
+    };
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
     try {
-        const payload = { customerEmail: custEmail, customerName: custName || null, items };
-        
-        if (isEditing) {
-            await apiCall(`/merchant/invoices/${currentInvId}`, {
-                method: "PUT",
-                body: JSON.stringify(payload)
-            });
-            showToast('Invoice updated and new link sent!', 'success');
-        } else {
-            await API.merchant.createInvoice(payload);
-            showToast('Invoice created!', 'success');
+        const response = await fetch("http://localhost:8080/merchant/invoices", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + localStorage.getItem("billme_token")
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const responseText = await response.text();
+        let responseData = null;
+        try {
+            responseData = responseText ? JSON.parse(responseText) : null;
+        } catch (e) {
+            console.warn("Non-JSON response received:", responseText);
         }
 
-        invoiceList = await API.merchant.getInvoices().catch(() => invoiceList);
-        renderInvoices();
-        renderCharts(invoiceList);
-        document.getElementById('stat-invoices').textContent = invoiceList.length;
-        document.getElementById('invoiceListCard').style.display = 'block';
-        document.getElementById('createInvoiceForm').style.display = 'none';
-        currentInvId = null; // reset
+        if (!response.ok) {
+            const isEmailError = responseText.includes("Failed to send invoice email") ||
+                                 responseText.includes("Too many emails") ||
+                                 responseText.includes("Email error");
+
+            if (isEmailError) {
+                console.warn("⚠️ Email failed but invoice created successfully");
+                showToast("Invoice created but email failed ⚠️", "warning");
+                // Continue to success UI flow
+            } else {
+                throw new Error(responseData?.message || responseText || `Error ${response.status}`);
+            }
+        } else {
+            showToast('Invoice created successfully!', 'success');
+        }
+
+        // --- SUCCESS UI FLOW (ALWAYS RUN IF CREATED) ---
+
+        // 1. Reset Form
+        custEmailEl.value = '';
+        if (custNameEl) custNameEl.value = '';
+        const itemsContainer = document.getElementById('inv-items-container');
+        if (itemsContainer) {
+            itemsContainer.innerHTML = '';
+            renderInvoiceItemRow(); // Add one fresh row
+        }
+
+        // 2. Refresh Dashboard Data
+        try {
+           const [newInvoices, newPm] = await Promise.all([
+               API.merchant.getInvoices().catch(() => []),
+               API.merchant.getPaymentMethods().catch(() => ({ UPI: 0, FACE_PAY: 0, CARD: 0 }))
+           ]);
+           invoiceList = newInvoices || [];
+           renderInvoices();
+           renderCharts(invoiceList, newPm);
+        } catch(refreshErr) {
+           console.error("Dashboard refresh failed:", refreshErr);
+        }
+
+        // 3. Navigate back to list
+        const listCard = document.getElementById('invoiceListCard');
+        const formSection = document.getElementById('createInvoiceForm');
+        if (listCard) listCard.style.display = 'block';
+        if (formSection) formSection.style.display = 'none';
+
     } catch (e) {
-        showToast(e.message || 'Action failed', 'error');
+        console.error("🔥 Invoice Creation Error:", e);
+        showToast(safeErrorMessage(e), 'error');
     } finally {
-        btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> ' + (isEditing ? 'Update Invoice' : 'Create Invoice');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Create Invoice';
     }
 }
 
@@ -876,7 +1006,7 @@ function esc(str) {
 
 // Expose globals used in inline HTML
 window.previewInvoice = previewInvoice;
-window.editInvoice = function(id) {
+window.editInvoice = function (id) {
     const inv = invoiceList.find(i => i.invoiceId === id);
     if (!inv) return;
     if (inv.status !== 'UNPAID') {
@@ -884,7 +1014,7 @@ window.editInvoice = function(id) {
         return;
     }
     currentInvId = id;
-    
+
     // Switch to form
     document.getElementById('invoiceListCard').style.display = 'none';
     const form = document.getElementById('createInvoiceForm');
@@ -895,10 +1025,10 @@ window.editInvoice = function(id) {
     // Populate
     document.getElementById('inv-custEmail').value = inv.customerEmail || '';
     document.getElementById('inv-custName').value = inv.customerName || '';
-    
+
     const container = document.getElementById('inv-items-container');
     container.innerHTML = '';
-    
+
     if (inv.items && inv.items.length) {
         inv.items.forEach(item => {
             // Find matching product in productList by name snapshot or we might need productId from backend
@@ -908,7 +1038,7 @@ window.editInvoice = function(id) {
             renderInvoiceItemRow();
             const row = container.lastElementChild;
             const sel = row.querySelector('.inv-prod-select');
-            
+
             // Better matching using productId
             if (item.productId) {
                 sel.value = item.productId;
@@ -928,13 +1058,13 @@ window.editInvoice = function(id) {
         renderInvoiceItemRow();
     }
 };
-window.copyPaymentLink = function(num, token) {
+window.copyPaymentLink = function (num, token) {
     if (!num || !token) {
         showToast('Cannot generate link for this invoice', 'warning');
         return;
     }
     const link = `${window.location.origin}/frontend/Face_Payment-Shravani_UI/pay-invoice.html?num=${num}&token=${token}`;
-    
+
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(link).then(() => {
             showToast('Payment link copied to clipboard!', 'success');

@@ -28,4 +28,5 @@ public class CustomerInvoiceResponse {
     private String paymentToken;
     private String customerName;
     private String customerEmail;
+    private LocalDateTime refundWindowExpiry;
 }

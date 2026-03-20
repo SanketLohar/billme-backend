@@ -16,13 +16,13 @@ public class AdminBootstrap implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${app.admin.bootstrap.enabled:false}")
+    @Value("${ADMIN_BOOTSTRAP:false}")
     private boolean enabled;
 
-    @Value("${app.admin.bootstrap.email:}")
+    @Value("${ADMIN_EMAIL:}")
     private String adminEmail;
 
-    @Value("${app.admin.bootstrap.password:}")
+    @Value("${ADMIN_PASSWORD:}")
     private String adminPassword;
 
     @Override

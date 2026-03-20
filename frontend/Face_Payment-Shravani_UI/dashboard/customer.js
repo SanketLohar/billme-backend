@@ -3,6 +3,22 @@
  * Hardened for Production Stabilization
  */
 
+// ── Error Handling Utilities ──────────────────────────────────
+function safeErrorMessage(e) {
+    if (!e) return "Unknown error";
+    if (typeof e === "string") return e;
+    if (e.message) return e.message;
+    if (e.error) return e.error;
+    if (typeof e === 'object') {
+        try { return JSON.stringify(e); } catch(s) { return "Something went wrong"; }
+    }
+    return "Something went wrong";
+}
+
+window.addEventListener("error", function (e) {
+    console.error("GLOBAL ERROR:", e.error || e.message);
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem("billme_token");
     const role = localStorage.getItem("billme_role");
@@ -34,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
         console.error('Failed to load dashboard:', err);
         if (window.API && window.API.showToast) {
-            window.API.showToast('Failed to load dashboard data', 'error');
+            window.API.showToast(`Failed to load dashboard: ${safeErrorMessage(err)}`, 'error');
         }
     }
 });
@@ -140,7 +156,14 @@ function renderInvoices(invoices) {
         if (status === 'UNPAID') {
             actionsHtml += `<button class="btn btn-primary btn-sm" onclick="payInvoice('${inv.invoiceNumber}', '${inv.paymentToken}')">Pay Now</button>`;
         } else if (status === 'PAID') {
-            actionsHtml += `<button class="btn btn-outline-danger btn-sm" onclick="requestRefund('${invoiceId}')">Request Refund</button>`;
+            const now = new Date();
+            const expiry = inv.refundWindowExpiry ? new Date(inv.refundWindowExpiry) : null;
+            
+            if (!expiry || expiry > now) {
+                actionsHtml += `<button class="btn btn-outline-danger btn-sm" onclick="requestRefund('${invoiceId}')">Request Refund</button>`;
+            } else {
+                actionsHtml += `<span class="badge badge-secondary" style="font-size:11px; opacity:0.6;">Refund Window Closed</span>`;
+            }
         } else if (status === 'REFUND_REQUESTED') {
             actionsHtml += `<span class="badge badge-info" style="font-size:11px;">Pending Refund</span>`;
         }

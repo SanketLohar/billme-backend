@@ -54,6 +54,11 @@ public class RefundService {
         }
 
         if (approve) {
+            // 🔒 Second-level check: Verify refund window again before processing
+            if (invoice.getRefundWindowExpiry() == null ||
+                    invoice.getRefundWindowExpiry().isBefore(LocalDateTime.now())) {
+                throw new RuntimeException("Refund window expired. This transaction is no longer eligible for refund.");
+            }
             refundInvoice(invoiceId);
         } else {
             rejectRefund(invoiceId);
@@ -67,6 +72,12 @@ public class RefundService {
 
         if (invoice.getStatus() != InvoiceStatus.PAID) {
             throw new RuntimeException("Only paid invoices can be refunded");
+        }
+
+        // 🔒 Enforce refund window validation AT THE SOURCE
+        if (invoice.getRefundWindowExpiry() != null &&
+                invoice.getRefundWindowExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Refund window expired. This invoice is no longer eligible for a refund.");
         }
 
         invoice.setStatus(InvoiceStatus.REFUND_REQUESTED);

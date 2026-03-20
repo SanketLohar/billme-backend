@@ -40,32 +40,61 @@ public class RefundController {
 
     @GetMapping("/email/approve/{token}")
     public String approveRefundEmail(@PathVariable String token) {
-        if (!refundTokenService.isTokenValid(token)) {
-            return "Invalid or expired link. Please request a new one.";
+        try {
+            if (!refundTokenService.isTokenValid(token)) {
+                return renderStatusPage("Invalid link", "This refund link is invalid or has already been used.", false);
+            }
+            
+            Long invoiceId = refundTokenService.extractInvoiceId(token);
+            Long merchantId = refundTokenService.extractMerchantId(token);
+            
+            refundService.validateAndProcessRefund(invoiceId, merchantId, true);
+            
+            return renderStatusPage("Refund Approved", "The refund has been processed successfully. The funds will be credited to the customer shortly.", true);
+        } catch (Exception e) {
+            return renderStatusPage("Approval Failed", e.getMessage(), false);
         }
-        
-        Long invoiceId = refundTokenService.extractInvoiceId(token);
-        Long merchantId = refundTokenService.extractMerchantId(token);
-        
-        // Internal Validation and Status Check
-        refundService.validateAndProcessRefund(invoiceId, merchantId, true);
-        
-        return "Refund approved successfully. You can close this tab.";
     }
 
     @GetMapping("/email/reject/{token}")
     public String rejectRefundEmail(@PathVariable String token) {
-        if (!refundTokenService.isTokenValid(token)) {
-            return "Invalid or expired link. Please request a new one.";
+        try {
+            if (!refundTokenService.isTokenValid(token)) {
+                return renderStatusPage("Invalid link", "This refund link is invalid or has already been used.", false);
+            }
+            
+            Long invoiceId = refundTokenService.extractInvoiceId(token);
+            Long merchantId = refundTokenService.extractMerchantId(token);
+            
+            refundService.validateAndProcessRefund(invoiceId, merchantId, false);
+            
+            return renderStatusPage("Refund Rejected", "The refund request has been declined. No funds were transferred.", true);
+        } catch (Exception e) {
+            return renderStatusPage("Rejection Failed", e.getMessage(), false);
         }
+    }
+
+    private String renderStatusPage(String title, String message, boolean success) {
+        String icon = success ? "fa-check-circle" : "fa-exclamation-circle";
+        String color = success ? "#34a853" : "#ea4335";
         
-        Long invoiceId = refundTokenService.extractInvoiceId(token);
-        Long merchantId = refundTokenService.extractMerchantId(token);
-        
-        // Internal Validation and Status Check
-        refundService.validateAndProcessRefund(invoiceId, merchantId, false);
-        
-        return "Refund rejected successfully. You can close this tab.";
+        return "<!DOCTYPE html><html><head>" +
+               "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css'>" +
+               "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap' rel='stylesheet'>" +
+               "<style>" +
+               "body { font-family: 'Inter', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8f9fa; color: #3c4043; }" +
+               ".card { background: white; padding: 48px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); text-align: center; max-width: 400px; width: 90%; }" +
+               ".icon { font-size: 64px; color: " + color + "; margin-bottom: 24px; }" +
+               "h1 { margin: 0 0 16px; font-weight: 800; font-size: 24px; }" +
+               "p { margin: 0; line-height: 1.6; color: #5f6368; }" +
+               ".btn { display: inline-block; margin-top: 32px; padding: 12px 32px; background: #1a73e8; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }" +
+               "</style></head><body>" +
+               "<div class='card'>" +
+               "<div class='icon'><i class='fas " + icon + "'></i></div>" +
+               "<h1>" + title + "</h1>" +
+               "<p>" + message + "</p>" +
+               "<a href='#' onclick='window.close()' class='btn'>Close Tab</a>" +
+               "</div></body></html>";
     }
 
     @GetMapping("/merchant/refunds")

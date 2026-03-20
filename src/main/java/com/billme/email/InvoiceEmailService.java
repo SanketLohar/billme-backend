@@ -2,8 +2,8 @@ package com.billme.email;
 
 import com.billme.invoice.Invoice;
 import com.billme.invoice.InvoicePdfService;
-import com.billme.invoice.InvoiceTemplateService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -12,14 +12,18 @@ import org.springframework.stereotype.Service;
 
 import jakarta.mail.internet.MimeMessage;
 import java.io.ByteArrayInputStream;
-
+import com.billme.util.NumberToWords;
+/**
+ * Service for sending invoice emails with PDF attachments.
+ * Production-safe: non-blocking + clean email UX
+ */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class InvoiceEmailService {
 
     private final JavaMailSender mailSender;
     private final InvoicePdfService pdfService;
-    private final InvoiceTemplateService templateService;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -27,16 +31,19 @@ public class InvoiceEmailService {
     @Async
     public void sendInvoiceEmail(Invoice invoice) {
 
+        if (invoice == null) {
+            log.error("Cannot send email: Invoice is null");
+            return;
+        }
+
+        log.info("📧 Sending invoice email: {}", invoice.getInvoiceNumber());
+
         try {
-
-            // Generate HTML invoice (used for preview if needed)
-            String html = templateService.generateInvoiceHtml(invoice);
-
-            // Generate PDF directly from invoice
+            // ✅ Generate PDF
             byte[] pdf = pdfService.generateInvoicePdf(invoice);
 
+            // ✅ Create email
             MimeMessage message = mailSender.createMimeMessage();
-
             MimeMessageHelper helper =
                     new MimeMessageHelper(message, true, "UTF-8");
 
@@ -49,13 +56,14 @@ public class InvoiceEmailService {
                             invoice.getMerchant().getBusinessName()
             );
 
-            // Secure Pay Now link
+            // ✅ Secure Pay Now link
             String payLink = frontendUrl
-                    + "/pay-invoice.html?invoice="
+                    + "/pay-invoice.html?num="
                     + invoice.getInvoiceNumber()
                     + "&token="
                     + invoice.getPaymentToken();
 
+            // ✅ CLEAN EMAIL TEMPLATE (IMPORTANT FIX)
             String htmlContent =
                     "<div style='font-family: Arial, sans-serif; max-width:600px;margin:auto'>" +
                             "<h2 style='color:#1a73e8'>BillMe</h2>" +
@@ -74,15 +82,24 @@ public class InvoiceEmailService {
 
             helper.setText(htmlContent, true);
 
+            // ✅ Attach PDF
             helper.addAttachment(
                     "invoice-" + invoice.getInvoiceNumber() + ".pdf",
                     () -> new ByteArrayInputStream(pdf)
             );
 
+            // ✅ Send email
             mailSender.send(message);
 
+            log.info("✅ Email sent successfully: {}", invoice.getInvoiceNumber());
+
         } catch (Exception e) {
-            throw new RuntimeException("Failed to send invoice email", e);
+
+            // ✅ DO NOT BREAK FLOW
+            log.error("❌ Email failed for {}: {}",
+                    invoice.getInvoiceNumber(), e.getMessage());
+
+            // DO NOT throw exception
         }
     }
 }

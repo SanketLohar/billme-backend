@@ -178,7 +178,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             stream.getTracks().forEach(t => t.stop());
         }
         showToast('Payment successful!', 'success');
+        
+        // Auto redirect after 3 seconds or on button click
+        setTimeout(handlePostPaymentRedirect, 3000);
     }
+
+    window.handlePostPaymentRedirect = function() {
+        const role = (localStorage.getItem("billme_role") || "").toLowerCase();
+        
+        if (role === "customer") {
+            window.location.href = "dashboard/customer.html";
+        } else if (role === "merchant") {
+            window.location.href = "dashboard/merchant.html";
+        } else {
+            window.location.href = "index.html"; 
+        }
+    };
 
     function esc(str) {
         if (!str) return '';

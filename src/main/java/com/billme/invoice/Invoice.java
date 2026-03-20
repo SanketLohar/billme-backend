@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -128,5 +129,7 @@ public class Invoice {
 
     @Column(name = "payment_in_progress")
     private Boolean paymentInProgress = false;
+
+    private LocalDate dueDate;
 
 }

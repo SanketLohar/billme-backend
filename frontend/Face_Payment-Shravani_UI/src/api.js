@@ -92,12 +92,18 @@ async function apiCall(endpoint, options = {}) {
   }
 
   if (!response.ok) {
+  console.error("❌ API ERROR:", {
+    url,
+    status: response.status,
+    response: data
+  });
 
-    throw new Error(
-      data?.message || `Request failed (${response.status})`
-    );
-
-  }
+  throw new Error(
+    typeof data === "string"
+      ? data
+      : data?.message || JSON.stringify(data) || `Request failed (${response.status})`
+  );
+}
 
   return data;
 }

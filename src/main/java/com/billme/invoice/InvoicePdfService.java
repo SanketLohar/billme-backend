@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-
+import com.billme.util.NumberToWords;
 @Service
 @RequiredArgsConstructor
 public class InvoicePdfService {
@@ -17,7 +17,6 @@ public class InvoicePdfService {
     public byte[] generateInvoicePdf(Invoice invoice) {
 
         try {
-
             String html = invoiceTemplateService.generateInvoiceHtml(invoice);
 
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -25,12 +24,19 @@ public class InvoicePdfService {
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.withHtmlContent(html, null);
 
+            // ✅ CRITICAL: Load font properly
             ClassPathResource fontResource =
                     new ClassPathResource("fonts/NotoSans-Regular.ttf");
 
             try (InputStream fontStream = fontResource.getInputStream()) {
 
-                builder.useFont(() -> fontStream, "NotoSans");
+                builder.useFont(
+                        () -> fontStream,
+                        "NotoSans",
+                        400,
+                        PdfRendererBuilder.FontStyle.NORMAL,
+                        true // embed font
+                );
 
                 builder.toStream(outputStream);
                 builder.run();

@@ -8,6 +8,22 @@ let txTrendChart = null;
 let payDistChart = null;
 let merchantGrowthChart = null;
 
+// ── Error Handling Utilities ──────────────────────────────────
+function safeErrorMessage(e) {
+    if (!e) return "Unknown error";
+    if (typeof e === "string") return e;
+    if (e.message) return e.message;
+    if (e.error) return e.error;
+    if (typeof e === 'object') {
+        try { return JSON.stringify(e); } catch(s) { return "Something went wrong"; }
+    }
+    return "Something went wrong";
+}
+
+window.addEventListener("error", function (e) {
+    console.error("GLOBAL ERROR:", e.error || e.message);
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Auth Check
     const token = localStorage.getItem("billme_token");
@@ -129,7 +145,7 @@ async function loadDashboard() {
 
     } catch (err) {
         console.error('Dashboard Load Error:', err);
-        showToast('Failed to load dashboard data', 'error');
+        showToast(`Failed to load dashboard: ${safeErrorMessage(err)}`, 'error');
     } finally {
         toggleLoader(false);
     }

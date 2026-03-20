@@ -1,281 +1,221 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-
 <head>
-
     <meta charset="UTF-8" />
 
-    <title>BillMe Invoice</title>
-
     <style>
+
+        /* ❌ REMOVE @font-face (handled in Java) */
+
         body {
-            font-family: 'NotoSans', Arial, sans-serif;
+            font-family: 'NotoSans';
+            font-size: 13px;
             margin: 40px;
             color: #333;
         }
 
-        .header-table {
-            width: 100%;
+        .header {
+            display: flex;
+            justify-content: space-between;
             border-bottom: 2px solid #830AB1;
-            margin-bottom: 20px;
+            padding-bottom: 10px;
         }
 
         .logo {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: bold;
             color: #830AB1;
         }
 
-        .invoice-meta {
-            text-align: right;
-            font-size: 14px;
-        }
-
-        .status {
-            margin-top: 5px;
-        }
-
-        .status-badge {
-            background: #ffecec;
-            color: #d63031;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-
-        .billing-table {
-            width: 100%;
+        .section {
             margin-top: 20px;
-        }
-
-        .address-box {
-            width: 50%;
-            font-size: 14px;
-            line-height: 20px;
-            vertical-align: top;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-top: 15px;
+            font-size: 12px;
         }
 
-        th,
-        td {
+        th, td {
             border: 1px solid #ddd;
-            padding: 10px;
-            text-align: center;
-            font-size: 14px;
+            padding: 8px;
         }
 
         th {
-            background: #f4f4f4;
+            background: #f8f8f8;
+            font-weight: 600;
+            text-align: center;
         }
 
-        .totals {
-            width: 300px;
-            margin-top: 20px;
+        td {
+            text-align: center;
+        }
+
+        .left {
+            text-align: left;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .summary {
+            width: 350px;
             margin-left: auto;
         }
 
-        .grand-total {
-            background: #f9f2ff;
-            font-size: 16px;
+        .summary td:first-child {
+            text-align: left;
         }
 
-        .pay-section {
-            margin-top: 40px;
-            text-align: center;
+        .summary td:last-child {
+            text-align: right;
         }
 
-        .pay-button {
-            background: #27ae60;
-            color: white;
-            padding: 14px 28px;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 16px;
+        .highlight {
+            background: #f4eaff;
+            font-weight: bold;
         }
 
-        .footer {
-            margin-top: 60px;
-            font-size: 12px;
-            color: #777;
-            text-align: center;
+        .terms {
+            margin-top: 25px;
+            font-size: 11px;
         }
 
-        .divider {
-            height: 1px;
-            background: #eee;
-            margin-top: 20px;
-        }
     </style>
-
 </head>
 
 <body>
 
-    <table class="header-table">
+<!-- HEADER -->
+<div class="header">
+    <div class="logo">BillMe</div>
 
-        <tr>
+    <div>
+        <div><b>Invoice #:</b> <span th:text="${invoiceNumber}"></span></div>
+        <div><b>Date:</b> <span th:text="${invoiceDate}"></span></div>
+        <div><b>Due Date:</b> <span th:text="${dueDate}"></span></div>
+        <div><b>Status:</b> <span th:text="${status}"></span></div>
+    </div>
+</div>
 
-            <td class="logo">BillMe</td>
+<!-- BILLING -->
+<div class="section" style="display:flex; justify-content:space-between;">
+    <div>
+        <b>Bill From</b><br/>
+        <span th:text="${merchantName}"></span><br/>
+        <span th:text="${merchantAddress}"></span><br/>
+        GSTIN: <span th:text="${merchantGstin}"></span>
+    </div>
 
-            <td class="invoice-meta">
+    <div>
+        <b>Bill To</b><br/>
+        <span th:text="${customerName}"></span><br/>
+        <span th:text="${customerEmail}"></span>
+    </div>
+</div>
 
-                <div>
-                    Invoice #: <span th:text="${invoiceNumber}"></span>
-                </div>
+<!-- ITEMS -->
+<table>
+    <thead>
+    <tr>
+        <th class="left">Product</th>
+        <th>Qty</th>
+        <th>Unit Price</th>
+        <th>GST %</th>
+        <th>GST Amount</th>
+        <th>Total</th>
+    </tr>
+    </thead>
 
-                <div>
-                    Date:
-                    <span th:text="${invoiceDate}"></span>
-                </div>
+    <tbody>
+    <tr th:each="item : ${items}">
+        <td class="left" th:text="${item.productName}"></td>
+        <td th:text="${item.quantity}"></td>
+        <td class="right" th:text="'₹ ' + ${item.unitPrice}"></td>
+        <td th:text="${item.gstRate} + '%'"></td>
+        <td class="right" th:text="'₹ ' + ${item.gstAmount}"></td>
+        <td class="right" th:text="'₹ ' + ${item.totalPrice}"></td>
+    </tr>
+    </tbody>
+</table>
 
-                <div class="status">
-                    Status:
-                    <span class="status-badge" th:text="${status}">
-                    </span>
-                </div>
-
-            </td>
-
-        </tr>
-
-    </table>
-
-    <div class="divider"></div>
-
-    <table class="billing-table">
-
-        <tr>
-
-            <td class="address-box">
-
-                <strong>Bill From</strong><br />
-
-                <span th:text="${merchantName}"></span><br />
-                <span th:text="${merchantAddress}"></span><br />
-
-                <span th:if="${gstRegistered}">
-                    GSTIN: <span th:text="${merchantGstin}"></span>
-                </span>
-
-            </td>
-
-            <td class="address-box">
-
-                <strong>Bill To</strong><br />
-
-                <span th:text="${customerName}"></span><br />
-                <span th:text="${customerEmail}"></span><br />
-                <span th:text="${customerAddress}"></span>
-
-            </td>
-
-        </tr>
-
-    </table>
-
+<!-- TOTALS -->
+<div class="summary">
     <table>
 
-        <thead>
+        <tr>
+            <td>Subtotal</td>
+            <td th:text="'₹ ' + ${subtotal}"></td>
+        </tr>
 
-            <tr>
-                <th>Product</th>
-                <th>Qty</th>
-                <th>Unit Price</th>
-                <th th:if="${gstRegistered}">GST %</th>
-                <th th:if="${gstRegistered}">GST Amount</th>
-                <th>Total</th>
-            </tr>
+        <tr th:if="${isIntraState}">
+            <td>CGST</td>
+            <td th:text="'₹ ' + ${cgst}"></td>
+        </tr>
 
-        </thead>
+        <tr th:if="${isIntraState}">
+            <td>SGST</td>
+            <td th:text="'₹ ' + ${sgst}"></td>
+        </tr>
 
-        <tbody>
+        <tr th:unless="${isIntraState}">
+            <td>IGST</td>
+            <td th:text="'₹ ' + ${igst}"></td>
+        </tr>
 
-            <tr th:each="item : ${items}">
+        <tr>
+            <td>Platform Fee</td>
+            <td th:text="'₹ ' + ${processingFee}"></td>
+        </tr>
 
-                <td th:text="${item.productName}"></td>
-
-                <td th:text="${item.quantity}"></td>
-
-                <td th:text="'₹' + ${item.unitPrice}"></td>
-
-                <td th:if="${gstRegistered}" th:text="${item.gstRate} + '%'"></td>
-
-                <td th:if="${gstRegistered}" th:text="'₹' + ${item.gstAmount}"></td>
-
-                <td th:text="'₹' + ${item.totalPrice}"></td>
-
-            </tr>
-
-        </tbody>
+        <tr class="highlight">
+            <td>Total Payable</td>
+            <td th:text="'₹ ' + ${totalPayable}"></td>
+        </tr>
 
     </table>
+</div>
 
-    <div class="totals">
+<!-- AMOUNT IN WORDS -->
+<div class="section">
+    <b>Amount in Words:</b>
+    <span th:text="${amountInWords}"></span>
+</div>
 
-        <table>
+<!-- BANK -->
+<div class="section">
+    <b>Bank Details</b><br/>
+    <span th:text="${accountHolder}"></span><br/>
+    <span th:text="${bankName}"></span><br/>
+    A/C: <span th:text="${accountNumber}"></span><br/>
+    IFSC: <span th:text="${ifsc}"></span>
+</div>
 
-            <tr>
-                <td>Subtotal</td>
-                <td th:text="'₹' + ${subtotal}"></td>
-            </tr>
+<!-- UPI -->
+<div class="section">
+    <b>UPI:</b> <span th:text="${upiId}"></span>
+</div>
 
-            <th:block th:if="${gstRegistered}" th:each="slab : ${gstSummary}">
-                <tr>
-                    <td style="text-align: left; font-weight: bold;" th:text="'GST ' + ${slab.rate} + '%'"></td>
-                    <td></td>
-                </tr>
-                <th:block th:if="${isIntraState}">
-                    <tr>
-                        <td style="text-align: left; padding-left: 20px;" th:text="'CGST (' + ${slab.halfRate} + '%)'">
-                        </td>
-                        <td th:text="'₹' + ${slab.cgstAmount}"></td>
-                    </tr>
-                    <tr>
-                        <td style="text-align: left; padding-left: 20px;" th:text="'SGST (' + ${slab.halfRate} + '%)'">
-                        </td>
-                        <td th:text="'₹' + ${slab.sgstAmount}"></td>
-                    </tr>
-                </th:block>
-                <th:block th:unless="${isIntraState}">
-                    <tr>
-                        <td style="text-align: left; padding-left: 20px;" th:text="'IGST (' + ${slab.rate} + '%)'"></td>
-                        <td th:text="'₹' + ${slab.igstAmount}"></td>
-                    </tr>
-                </th:block>
-            </th:block>
+<!-- PAY BUTTON -->
+<div class="section" style="text-align:center;">
+    <a th:href="${payUrl}"
+       style="background:#27ae60;color:white;padding:10px 22px;text-decoration:none;border-radius:6px;font-size:13px;">
+        Pay Now
+    </a>
+</div>
 
-
-
-            <tr class="grand-total">
-                <td><strong>Total Payable</strong></td>
-                <td><strong th:text="'₹' + ${totalPayable}"></strong></td>
-            </tr>
-
-        </table>
-
-    </div>
-
-    <div class="pay-section">
-
-        <a class="pay-button" th:href="${payUrl}">
-            Pay Now
-        </a>
-
-    </div>
-
-    <div class="footer">
-
-        <p>This invoice was generated using BillMe.</p>
-
-        <p>Payments must be completed through the BillMe platform.</p>
-
-    </div>
+<!-- TERMS -->
+<div class="terms">
+    <b>Terms &amp; Conditions</b>
+    <ol>
+        <li>Goods once sold will not be taken back.</li>
+        <li>Payment must be completed before due date.</li>
+        <li>Subject to jurisdiction.</li>
+    </ol>
+</div>
 
 </body>
-
 </html>

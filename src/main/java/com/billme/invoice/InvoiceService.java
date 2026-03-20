@@ -16,13 +16,16 @@ import com.billme.transaction.TransactionType;
 import com.billme.user.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.billme.wallet.Wallet;
 import com.billme.wallet.WalletService;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.math.RoundingMode;
@@ -69,6 +72,7 @@ public class InvoiceService {
         
         invoice.setPaymentToken(generatePaymentToken());
         Invoice savedInvoice = invoiceRepository.save(invoice);
+        invoice.setDueDate(LocalDate.now().plusDays(7)); // default 7 days
         invoiceEmailService.sendInvoiceEmail(savedInvoice);
     }
 
@@ -99,16 +103,19 @@ public class InvoiceService {
     }
 
     private void validateMerchantProfile(MerchantProfile merchant) {
-        if (merchant.getBusinessName() == null || merchant.getBusinessName().isBlank() ||
-                merchant.getGstin() == null || merchant.getGstin().isBlank() ||
-                merchant.getAddress() == null || merchant.getAddress().isBlank()) {
-            throw new RuntimeException("Merchant profile incomplete. Please update profile.");
+
+        if (!merchant.isProfileCompleted()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Complete your profile before creating invoice"
+            );
         }
     }
 
     private void calculateAndPopulate(Invoice invoice, CreateInvoiceRequest request) {
+
         MerchantProfile merchant = invoice.getMerchant();
-        
+
         if (request.getCustomerEmail() == null || request.getCustomerEmail().isBlank()) {
             throw new RuntimeException("Customer email is required");
         }
@@ -118,35 +125,45 @@ public class InvoiceService {
         }
 
         invoice.setCustomerEmail(request.getCustomerEmail());
-        invoice.setCustomerName(request.getCustomerName() != null ? request.getCustomerName() : "Customer");
+        invoice.setCustomerName(
+                request.getCustomerName() != null ? request.getCustomerName() : "Customer"
+        );
 
-        // Try linking customer profile if exists
+        // Link customer if exists
         userRepository.findByEmail(request.getCustomerEmail()).ifPresent(u -> {
             customerProfileRepository.findByUser_Id(u.getId()).ifPresent(invoice::setCustomer);
         });
 
-        // 📍 Determine Place of Supply
+        // ================= PLACE OF SUPPLY =================
         String placeOfSupply = request.getCustomerState();
+
         if ((placeOfSupply == null || placeOfSupply.isBlank()) && invoice.getCustomer() != null) {
             placeOfSupply = invoice.getCustomer().getState();
         }
+
         if (placeOfSupply == null || placeOfSupply.isBlank()) {
-            placeOfSupply = merchant.getState(); 
+            placeOfSupply = merchant.getState();
         }
 
-        boolean isIntraState = merchant.getState() != null && merchant.getState().equalsIgnoreCase(placeOfSupply);
+        boolean isIntraState =
+                merchant.getState() != null &&
+                        merchant.getState().equalsIgnoreCase(placeOfSupply);
 
+        // ================= TOTALS =================
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal cgstTotal = BigDecimal.ZERO;
         BigDecimal sgstTotal = BigDecimal.ZERO;
         BigDecimal igstTotal = BigDecimal.ZERO;
 
+        // ================= ITEMS LOOP =================
         for (CreateInvoiceItemRequest itemRequest : request.getItems()) {
+
             if (itemRequest.getQuantity() == null || itemRequest.getQuantity() <= 0) {
                 throw new RuntimeException("Quantity must be greater than zero");
             }
 
             Product product = resolveProduct(itemRequest, merchant);
+
             if (!product.isActive()) {
                 throw new RuntimeException("Product is not active: " + product.getName());
             }
@@ -155,6 +172,7 @@ public class InvoiceService {
             BigDecimal unitPrice = product.getPrice();
             BigDecimal baseAmount = unitPrice.multiply(quantity);
 
+            // ================= GST =================
             BigDecimal gstRate = merchant.isGstRegistered()
                     ? BigDecimal.valueOf(product.getGstRate())
                     : BigDecimal.ZERO;
@@ -176,6 +194,7 @@ public class InvoiceService {
 
             BigDecimal lineTotal = baseAmount.add(itemGst);
 
+            // ================= 🚨 FIX HERE =================
             InvoiceItem item = InvoiceItem.builder()
                     .invoice(invoice)
                     .product(product)
@@ -185,6 +204,7 @@ public class InvoiceService {
                     .baseAmount(baseAmount)
                     .gstRate(gstRate)
                     .gstAmount(itemGst)
+                    .gstTotal(itemGst) // ✅ 🔥 FIX: THIS WAS MISSING
                     .cgstAmount(itemCgst)
                     .sgstAmount(itemSgst)
                     .igstAmount(itemIgst)
@@ -193,19 +213,26 @@ public class InvoiceService {
 
             invoice.getItems().add(item);
 
+            // ================= ACCUMULATE =================
             subtotal = subtotal.add(baseAmount);
             cgstTotal = cgstTotal.add(itemCgst);
             sgstTotal = sgstTotal.add(itemSgst);
             igstTotal = igstTotal.add(itemIgst);
         }
 
+        // ================= FINAL TOTALS =================
         BigDecimal totalGst = cgstTotal.add(sgstTotal).add(igstTotal);
+
         BigDecimal processingFee = subtotal
                 .multiply(processingFeePercent)
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-        BigDecimal totalPayable = subtotal.add(totalGst).add(processingFee).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalPayable = subtotal
+                .add(totalGst)
+                .add(processingFee)
+                .setScale(2, RoundingMode.HALF_UP);
 
+        // ================= SET INVOICE =================
         invoice.setSubtotal(subtotal);
         invoice.setCgstTotal(cgstTotal);
         invoice.setSgstTotal(sgstTotal);
@@ -384,6 +411,7 @@ public class InvoiceService {
                         : null)
                 .issuedAt(invoice.getIssuedAt())
                 .paidAt(invoice.getPaidAt())
+                .refundWindowExpiry(invoice.getRefundWindowExpiry())
                 .items(
                         invoice.getItems().stream()
                                 .map(item ->

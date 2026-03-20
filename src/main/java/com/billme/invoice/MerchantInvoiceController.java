@@ -19,6 +19,7 @@ public class MerchantInvoiceController {
     public ResponseEntity<String> createInvoice(
             @RequestBody CreateInvoiceRequest request) {
 
+        System.out.println("CreateInvoiceRequest received: " + request);
         invoiceService.createInvoice(request);
 
         return ResponseEntity.ok("Invoice created successfully");

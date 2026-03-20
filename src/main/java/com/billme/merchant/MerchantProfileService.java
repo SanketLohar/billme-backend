@@ -118,32 +118,46 @@ public class MerchantProfileService {
         boolean hasSettlementStarted = wallet.getBalance().compareTo(java.math.BigDecimal.ZERO) > 0
                 || wallet.getEscrowBalance().compareTo(java.math.BigDecimal.ZERO) > 0;
 
-        if (hasSettlementStarted) {
+// ================= BANK ACCOUNT SAFE UPDATE =================
 
-            if (request.getAccountNumber() != null &&
-                    !request.getAccountNumber().equals(profile.getAccountNumber())) {
+        if (request.getBankName() != null) {
+            profile.setBankName(request.getBankName());
+        }
+
+        if (request.getAccountHolderName() != null) {
+            profile.setAccountHolderName(request.getAccountHolderName());
+        }
+
+// 🔐 ACCOUNT NUMBER LOGIC
+        if (request.getAccountNumber() != null) {
+
+            if (hasSettlementStarted &&
+                    profile.getAccountNumber() != null &&
+                    !profile.getAccountNumber().equals(request.getAccountNumber())) {
 
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "Bank account cannot be changed after settlements begin"
+                        "Account number cannot be changed after payments"
                 );
             }
 
-        } else {
+            profile.setAccountNumber(request.getAccountNumber());
+        }
 
-            // Safe to update bank info
+// 🔐 IFSC LOGIC
+        if (request.getIfscCode() != null) {
 
-            if (request.getBankName() != null)
-                profile.setBankName(request.getBankName());
+            if (hasSettlementStarted &&
+                    profile.getIfscCode() != null &&
+                    !profile.getIfscCode().equals(request.getIfscCode())) {
 
-            if (request.getAccountHolderName() != null)
-                profile.setAccountHolderName(request.getAccountHolderName());
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "IFSC cannot be changed after payments"
+                );
+            }
 
-            if (request.getAccountNumber() != null)
-                profile.setAccountNumber(request.getAccountNumber());
-
-            if (request.getIfscCode() != null)
-                profile.setIfscCode(request.getIfscCode());
+            profile.setIfscCode(request.getIfscCode());
         }
 
         // ================= PROFILE COMPLETION VALIDATION =================
@@ -153,9 +167,13 @@ public class MerchantProfileService {
                         isValid(profile.getOwnerName()) &&
                         isValid(profile.getPhone()) &&
                         isValid(profile.getAddress()) &&
+                        isValid(profile.getCity()) &&
                         isValid(profile.getState()) &&
                         isValid(profile.getPinCode()) &&
-                        isValid(profile.getUpiId());
+                        isValid(profile.getUpiId()) &&
+                        isValid(profile.getBankName()) &&
+                        isValid(profile.getAccountNumber()) &&
+                        isValid(profile.getIfscCode());
 
         profile.setProfileCompleted(profileCompleted);
 
