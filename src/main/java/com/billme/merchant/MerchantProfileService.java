@@ -207,6 +207,7 @@ public class MerchantProfileService {
                 .profileCompleted(profile.isProfileCompleted())
                 .gstRegistered(profile.isGstRegistered())
                 .gstin(profile.getGstin())
+                .profileImageUrl(profile.getUser().getProfileImageUrl())
                 .build();
     }
 }

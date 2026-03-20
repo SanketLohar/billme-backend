@@ -5,5 +5,5 @@ import lombok.Data;
 @Data
 public class FacePayRequest {
 
-    private String embedding; // JSON string from frontend
+    private Object embedding; // 🔥 accept ANY format (array / object / string)
 }

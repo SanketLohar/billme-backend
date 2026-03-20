@@ -30,5 +30,6 @@ public class MerchantProfileResponse {
     private String gstin;
 
     private String email;
+    private String profileImageUrl;
     private String message;
 }

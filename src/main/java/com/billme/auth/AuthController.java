@@ -1,5 +1,7 @@
 package com.billme.auth;
 
+import com.billme.user.UserResponse;
+import org.springframework.security.core.Authentication;
 import com.billme.auth.token.RefreshToken;
 import com.billme.auth.token.RefreshTokenService;
 import com.billme.security.jwt.JwtService;
@@ -97,5 +99,19 @@ public class AuthController {
         );
 
         return ResponseEntity.ok("Password reset successfully.");
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getCurrentUser(Authentication authentication) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String email = authentication.getName();
+
+        UserResponse user = authService.getCurrentUser(email);
+
+        return ResponseEntity.ok(user);
     }
 }

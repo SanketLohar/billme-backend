@@ -15,5 +15,6 @@ public class CustomerLookupResponse {
 
     private String state;
     private String city;
+    private String profileImageUrl;
 
 }

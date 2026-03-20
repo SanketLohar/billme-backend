@@ -16,7 +16,14 @@ public class CustomerPaymentController {
             @PathVariable Long id,
             @RequestBody FacePayRequest request) {
 
-        String result = facePayService.payInvoice(id, request.getEmbedding());
+        Object embedding = request.getEmbedding();
+
+        // 🔥 DEBUG LOG (IMPORTANT)
+        if (embedding != null) {
+            System.out.println("🚨 [FACEPAY] RAW TYPE: " + embedding.getClass());
+        }
+
+        String result = facePayService.payInvoice(id, embedding);
         return ResponseEntity.ok(result);
     }
 }

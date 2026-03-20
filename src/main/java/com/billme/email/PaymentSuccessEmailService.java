@@ -49,7 +49,8 @@ public class PaymentSuccessEmailService {
             mailSender.send(message);
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to send payment success email", e);
+            System.err.println("🚨 [EMAIL ERROR] Failed to send payment success email: " + e.getMessage());
+            // We do NOT throw here to prevent rolling back or showing error to user
         }
     }
 }

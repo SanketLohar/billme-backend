@@ -43,7 +43,8 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/auth/login", "/auth/register/**", "/auth/refresh", "/auth/forgot-password", "/auth/reset-password").permitAll()
+                        .requestMatchers("/auth/me").authenticated()
                         .requestMatchers("/customer/email/**").hasAnyAuthority("ROLE_MERCHANT", "ROLE_CUSTOMER")
                         .requestMatchers("/merchant/**").hasAuthority("ROLE_MERCHANT")
                         .requestMatchers("/customer/**").hasAuthority("ROLE_CUSTOMER")
@@ -53,7 +54,7 @@ public class SecurityConfig {
                         .requestMatchers("/invoice/*/pdf").permitAll()
                         .requestMatchers("/public/**").permitAll()
                         .requestMatchers("/api/refund/email/**").permitAll()
-
+                        .requestMatchers("/uploads/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

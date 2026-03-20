@@ -106,7 +106,7 @@ async function loadCustomerData() {
         const profile = await window.API.customer.getProfile();
         if (profile) {
             const name = profile.fullName || profile.username || "Customer";
-            const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a73e8&color=fff`;
+            const avatarUrl = profile.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a73e8&color=fff`;
 
             setText('side-name', name);
             setText('side-id', '#' + (profile.id || 'CUST'));
@@ -120,6 +120,13 @@ async function loadCustomerData() {
 
             setImage('side-avatar', avatarUrl);
             setImage('prof-avatar', avatarUrl);
+            
+            // Also update the harmonized preview container if it exists
+            const previewContainer = document.getElementById('profile-preview-container');
+            if (previewContainer) {
+                previewContainer.innerHTML = `<img src="${avatarUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+                previewContainer.style.background = 'none';
+            }
         }
 
         /* ---------- INVOICES ---------- */

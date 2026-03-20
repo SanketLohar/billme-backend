@@ -10,6 +10,7 @@ import com.billme.repository.WalletRepository;
 import com.billme.security.jwt.JwtService;
 import com.billme.user.Role;
 import com.billme.user.User;
+import com.billme.user.UserResponse;
 import com.billme.wallet.Wallet;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -104,6 +105,7 @@ public class AuthService {
         Wallet wallet = Wallet.builder()
                 .user(user)
                 .balance(BigDecimal.ZERO)
+                .escrowBalance(BigDecimal.ZERO)
                 .build();
 
         walletRepository.save(wallet);
@@ -173,6 +175,7 @@ public class AuthService {
                 Wallet.builder()
                         .user(user)
                         .balance(BigDecimal.ZERO)
+                        .escrowBalance(BigDecimal.ZERO)
                         .build()
         );
 
@@ -264,5 +267,36 @@ public class AuthService {
                 user.getRole().name(),
                 user.getId()
         );
+    }
+
+    public com.billme.user.UserResponse getMe(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found"
+                ));
+
+        return com.billme.user.UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .profileImageUrl(user.getProfileImageUrl())
+                .createdAt(user.getCreatedAt())
+                .active(user.isActive())
+                .build();
+    }
+
+    public UserResponse getCurrentUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .profileImageUrl(user.getProfileImageUrl())
+                .createdAt(user.getCreatedAt())
+                .active(user.isActive())
+                .build();
     }
 }

@@ -46,4 +46,6 @@ public class User {
     private int failedAttempts = 0;
 
     private LocalDateTime lockUntil;
+
+    private String profileImageUrl;
 }

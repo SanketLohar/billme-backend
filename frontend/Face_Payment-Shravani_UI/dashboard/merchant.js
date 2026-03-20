@@ -123,7 +123,12 @@ function renderSidebar(profile) {
     if (sbUpi) sbUpi.textContent = upiId;
 
     if (topAvatar) {
-        topAvatar.textContent = businessName.charAt(0).toUpperCase();
+        if (profile && profile.profileImageUrl) {
+            topAvatar.innerHTML = `<img src="${profile.profileImageUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+            topAvatar.style.background = 'none';
+        } else {
+            topAvatar.textContent = businessName.charAt(0).toUpperCase();
+        }
     }
 
     if (badge) {

@@ -1,139 +1,72 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const params = new URLSearchParams(window.location.search);
     const invoiceNumber = params.get('invoiceNumber') || params.get('num');
-    const token = params.get('token');
+    const tokenParam = params.get('token');
 
-    // UI Elements
     const loader = document.getElementById('loader');
     const content = document.getElementById('payment-content');
     const successArea = document.getElementById('success-area');
     const actionArea = document.getElementById('action-area');
     const cameraSection = document.getElementById('cameraSection');
     const video = document.getElementById('video');
-    
-    // Data Elements
+
     const merchantName = document.getElementById('merchant-name');
     const merchantGst = document.getElementById('merchant-gst');
     const itemsList = document.getElementById('items-list');
     const subTotalElem = document.getElementById('sub-total');
-    const platformFeeElem = document.getElementById('platform-fee'); // NEW
-    const cgstElem = document.getElementById('cgst-total'); // NEW
-    const sgstElem = document.getElementById('sgst-total'); // NEW
-    const taxTotalElem = document.getElementById('tax-total'); // Keep for safety if exists
+    const platformFeeElem = document.getElementById('platform-fee');
+    const cgstElem = document.getElementById('cgst-total');
+    const sgstElem = document.getElementById('sgst-total');
+    const taxTotalElem = document.getElementById('tax-total');
     const grandTotalElem = document.getElementById('grand-total');
     const invoiceLabel = document.getElementById('invoice-label');
 
     let currentInvoice = null;
     let stream = null;
 
-    if (!invoiceNumber || !token) {
-        showToast('Invalid payment link. Missing invoice number or token.', 'error');
-        loader.innerHTML = '<p class="text-danger">Invalid payment link. Please check your URL.</p>';
+    if (!invoiceNumber || !tokenParam) {
+        showToast('Invalid payment link.', 'error');
         return;
     }
 
     try {
-        // Fetch Public Invoice Data
-        const invoice = await window.API.invoice.getPublic(invoiceNumber, token);
-
-        if (!invoice) throw new Error("Invoice not found or link expired");
+        const invoice = await window.API.invoice.getPublic(invoiceNumber, tokenParam);
         currentInvoice = invoice;
 
-        // Populate UI with null guards
-        if (merchantName) merchantName.innerText = invoice.merchantName || 'BillMe Merchant';
-        if (merchantGst) merchantGst.innerText = invoice.merchantGSTIN ? `GSTIN: ${invoice.merchantGSTIN}` : 'GST Not Applicable';
-        if (invoiceLabel) invoiceLabel.innerText = `Invoice #${invoice.invoiceNumber}`;
-        
-        if (itemsList) {
-            itemsList.innerHTML = (invoice.items || []).map(item => `
-                <div class="item-row">
-                    <span>${esc(item.productName)} (x${item.quantity})</span>
-                    <span class="fw-600">₹${(item.totalPrice || 0).toFixed(2)}</span>
-                </div>
-            `).join('');
-        }
-    
-        if (subTotalElem) subTotalElem.innerText = `₹${(invoice.subtotal || 0).toFixed(2)}`;
-        if (platformFeeElem) platformFeeElem.innerText = `₹${(invoice.processingFee || 0).toFixed(2)}`;
-        if (cgstElem) cgstElem.innerText = `₹${(invoice.cgstAmount || 0).toFixed(2)}`;
-        if (sgstElem) sgstElem.innerText = `₹${(invoice.sgstAmount || 0).toFixed(2)}`;
-        // Fallback for legacy total tax if container exists
+        merchantName.innerText = invoice.merchantName || 'BillMe Merchant';
+        merchantGst.innerText = invoice.merchantGSTIN ? `GSTIN: ${invoice.merchantGSTIN}` : 'GST Not Applicable';
+        invoiceLabel.innerText = `Invoice #${invoice.invoiceNumber}`;
+
+        itemsList.innerHTML = (invoice.items || []).map(item => `
+            <div class="item-row">
+                <span>${esc(item.productName)} (x${item.quantity})</span>
+                <span>₹${(item.totalPrice || 0).toFixed(2)}</span>
+            </div>
+        `).join('');
+
+        subTotalElem.innerText = `₹${(invoice.subtotal || 0).toFixed(2)}`;
+        platformFeeElem.innerText = `₹${(invoice.processingFee || 0).toFixed(2)}`;
+        cgstElem.innerText = `₹${(invoice.cgstAmount || 0).toFixed(2)}`;
+        sgstElem.innerText = `₹${(invoice.sgstAmount || 0).toFixed(2)}`;
         if (taxTotalElem) taxTotalElem.innerText = `₹${(invoice.gstTotal || 0).toFixed(2)}`;
-        if (grandTotalElem) grandTotalElem.innerText = `₹${(invoice.totalPayable || 0).toFixed(2)}`;
+        grandTotalElem.innerText = `₹${(invoice.totalPayable || 0).toFixed(2)}`;
 
         loader.style.display = 'none';
         content.style.display = 'block';
 
-        if (invoice.status === 'PAID') {
-            actionArea.innerHTML = '<div class="badge badge-success w-100 py-3" style="font-size:16px; border-radius:12px;"><i class="fas fa-check-circle"></i> INVOICE ALREADY PAID</div>';
-        }
-
     } catch (err) {
+        showToast('Failed to load invoice', 'error');
         console.error(err);
-        showToast(err.message || 'Failed to load invoice details', 'error');
-        loader.innerHTML = `<p class="text-danger">${err.message || 'Failed to load invoice.'}</p>`;
     }
 
-    // --- UPI / Razorpay ---
-    document.getElementById('btn-upi')?.addEventListener('click', async () => {
-        const btn = document.getElementById('btn-upi');
-        if (!currentInvoice || !currentInvoice.totalPayable) {
-            showToast('Invoice details not loaded correctly', 'error');
-            return;
-        }
+    // =========================
+    // FACEPAY START
+    // =========================
 
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-
-        try {
-            // Internal ID used for order creation
-            const orderId = await window.API.payment.createOrder(currentInvoice.id);
-
-            const options = {
-                key: 'rzp_test_SIgyziHVJLgRT2', // Correct test key from application.properties
-                amount: Math.round(currentInvoice.totalPayable * 100), // Ensure paise is an integer
-                currency: "INR",
-                name: "BillMe Payment",
-                description: `Invoice ${currentInvoice.invoiceNumber}`,
-                order_id: orderId,
-                handler: async function (response) {
-                    try {
-                        await window.API.payment.verifyRazorpay({
-                            razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_order_id: response.razorpay_order_id,
-                            razorpay_signature: response.razorpay_signature
-                        });
-                        showSuccess();
-                    } catch (e) {
-                        showToast('Payment verification failed: ' + (e.message || 'Check connection'), 'error');
-                    }
-                },
-                modal: {
-                    ondismiss: function() {
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fas fa-qrcode"></i> UPI / Card';
-                    }
-                },
-                theme: { color: "#1a73e8" }
-            };
-            const rzp = new window.Razorpay(options);
-            rzp.open();
-        } catch (err) {
-            showToast(err.message || 'Payment initiation failed', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-qrcode"></i> UPI / Card';
-        }
-    });
-
-    // --- FacePay ---
     document.getElementById('btn-facepay')?.addEventListener('click', async () => {
-        const btn = document.getElementById('btn-facepay');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading AI...';
-
         try {
-            // Load face-api.js models from CDN or local
             const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+
             await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
@@ -143,60 +76,82 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             stream = await navigator.mediaDevices.getUserMedia({ video: {} });
             video.srcObject = stream;
+
         } catch (err) {
-            showToast('FacePay initialization failed. Check camera permissions.', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-camera"></i> FacePay';
+            showToast('Camera error', 'error');
         }
     });
 
     document.getElementById('btn-verify')?.addEventListener('click', async () => {
-        const btn = document.getElementById('btn-verify');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying Face...';
-
         try {
-            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
-            if (!detection) throw new Error("No face detected. Please look into the camera.");
+            const detection = await faceapi
+                .detectSingleFace(video)
+                .withFaceLandmarks()
+                .withFaceDescriptor();
 
-            const descriptor = Array.from(detection.descriptor);
-            // Use API.payment namespace as standardized
-            const res = await window.API.payment.payWithFace(currentInvoice.id, { embedding: JSON.stringify(descriptor) });
+            if (!detection) throw new Error("No face detected");
 
-            if (res) showSuccess();
+            const BASE_URL = "http://localhost:8080";
+            const token = localStorage.getItem("billme_token");
+
+            // ✅ CRITICAL FIX (ONLY THIS MATTERS)
+            const embedding = Array.from(detection.descriptor).map(Number);
+
+            // ✅ HARD VALIDATION
+            if (!Array.isArray(embedding)) throw new Error("Embedding not array");
+            if (embedding.length !== 128) throw new Error("Invalid embedding size");
+
+            // ✅ DEBUG
+            console.log("✅ FINAL ARRAY:", embedding);
+            console.log("✅ TYPE:", typeof embedding[0]);
+
+            // ✅ STRINGIFY SAFELY
+            const payload = JSON.stringify({ embedding });
+
+            console.log("🚀 PAYLOAD:", payload);
+
+            const res = await fetch(`${BASE_URL}/customer/invoices/${currentInvoice.id}/pay/face`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: payload
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText);
+            }
+
+            showSuccess();
+
         } catch (err) {
-            showToast(err.message || 'Face comparison failed. Not recognized.', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-fingerprint"></i> Verify & Pay';
+            console.error(err);
+            showToast(err.message, 'error');
         }
     });
+
+    // =========================
+    // SUCCESS
+    // =========================
 
     function showSuccess() {
         content.style.display = 'none';
         successArea.style.display = 'block';
+
         if (stream) {
             stream.getTracks().forEach(t => t.stop());
         }
+
         showToast('Payment successful!', 'success');
-        
-        // Auto redirect after 3 seconds or on button click
-        setTimeout(handlePostPaymentRedirect, 3000);
+
+        setTimeout(() => {
+            window.location.href = "dashboard/customer.html";
+        }, 3000);
     }
 
-    window.handlePostPaymentRedirect = function() {
-        const role = (localStorage.getItem("billme_role") || "").toLowerCase();
-        
-        if (role === "customer") {
-            window.location.href = "dashboard/customer.html";
-        } else if (role === "merchant") {
-            window.location.href = "dashboard/merchant.html";
-        } else {
-            window.location.href = "index.html"; 
-        }
-    };
-
     function esc(str) {
-        if (!str) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return String(str || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 });

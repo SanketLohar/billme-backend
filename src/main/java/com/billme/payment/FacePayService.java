@@ -16,7 +16,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 @Service
@@ -31,13 +30,22 @@ public class FacePayService {
     private static final double FACE_MATCH_THRESHOLD = 0.80;
 
     @Transactional
-    public String payInvoice(Long invoiceId, String paymentEmbedding) {
+    public String payInvoice(Long invoiceId, Object paymentEmbedding) {
+
+        // 🔥 Convert ANY format → double[]
+        double[] embedding = FaceRecognitionUtil.parseEmbedding(paymentEmbedding);
+
+        // 🔥 Strict validation AFTER parsing
+        if (embedding.length != 128) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid embedding size. Expected 128, got " + embedding.length);
+        }
 
         User customer = getLoggedInUser();
 
         Invoice invoice = invoiceRepository
                 .findByIdAndCustomer_User_Id(invoiceId, customer.getId())
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
 
         if (invoice.getStatus() == InvoiceStatus.PAID) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Invoice already paid");
@@ -45,11 +53,11 @@ public class FacePayService {
 
         CustomerProfile profile = customerProfileRepository
                 .findByUser_Id(customer.getId())
-                .orElseThrow(() -> new RuntimeException("Customer profile not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Customer profile not found"));
 
         boolean match = FaceRecognitionUtil.isMatch(
                 profile.getFaceEmbeddings(),
-                paymentEmbedding,
+                embedding,
                 FACE_MATCH_THRESHOLD
         );
 
@@ -57,15 +65,12 @@ public class FacePayService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Face verification failed");
         }
 
-        // set payment method
         invoice.setPaymentMethod(PaymentMethod.FACE_PAY);
-
         invoiceRepository.save(invoice);
 
-        // settle payment
         settlementService.settlePayment(
                 invoice,
-                invoice.getSubtotal(),
+                invoice.getTotalPayable(),
                 "FACEPAY-" + UUID.randomUUID()
         );
 

@@ -32,8 +32,13 @@ async function apiCall(endpoint, options = {}) {
     ...(options.headers || {}),
   };
 
-  // Attach JSON header only if body exists
-  if (options.body) {
+  // Centralized Serialization Fix:
+  // Automatically stringify body if it's an object and not FormData
+  if (options.body && !(options.body instanceof FormData) && typeof options.body !== 'string') {
+    options.body = JSON.stringify(options.body);
+    headers["Content-Type"] = "application/json";
+  } else if (options.body && typeof options.body === 'string') {
+    // If body is already a string, assume it's JSON and set header
     headers["Content-Type"] = "application/json";
   }
 
@@ -158,28 +163,27 @@ const API = {
     login: (data) =>
       apiCall("/auth/login", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }),
 
     registerMerchant: (data) =>
       apiCall("/auth/register/merchant", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }),
 
     registerCustomer: (data) =>
       apiCall("/auth/register/customer", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }),
 
     logout: () => {
-
       clearAuth();
+      window.location.href = "/frontend/Face_Payment-Shravani_UI/src/login.html";
+    },
 
-      window.location.href = "../src/login.html";
-
-    }
+    getMe: () => apiCall("/auth/me")
 
   },
 
@@ -191,13 +195,13 @@ const API = {
     updateProfile: (data) =>
       apiCall("/api/merchant/profile", {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: data,
       }),
     getProducts: () => apiCall("/api/merchant/products"),
     createProduct: (data) =>
       apiCall("/api/merchant/products", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }),
     deleteProduct: (id) =>
       apiCall(`/api/merchant/products/${id}`, {
@@ -207,7 +211,7 @@ const API = {
     createInvoice: (data) =>
       apiCall("/merchant/invoices", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }),
     downloadInvoicePdf: (id) => apiDownload(`/invoice/${id}/pdf`),
     getPaymentMethods: () => apiCall("/api/merchant/reports/payment-methods"),
@@ -243,15 +247,13 @@ const API = {
       apiCall(`/api/payments/create-order/${invoiceId}`, {
         method: "POST",
       }),
-    payWithFace: (invoiceId, data) =>
-      apiCall(`/customer/invoices/${invoiceId}/pay/face`, {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+    payWithFace: () => {
+      throw new Error("❌ payWithFace SHOULD NOT BE CALLED. Use direct fetch in pay-invoice.js instead.");
+    },
     verifyRazorpay: (data) =>
       apiCall("/api/payments/verify", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }),
     refund: (invoiceId) =>
       apiCall(`/api/refund/${invoiceId}`, {
@@ -295,7 +297,7 @@ const API = {
     sendReportEmail: (data) =>
       apiCall("/api/merchant/reports/email", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }),
   },
 
@@ -308,7 +310,7 @@ const API = {
     ask: (data) => 
       apiCall("/api/chatbot/ask", {
         method: "POST",
-        body: JSON.stringify(data)
+        body: data
       })
 
   },
@@ -337,9 +339,21 @@ const API = {
   notifications: {
     get: () => apiCall("/api/notifications"),
     markRead: (id) => apiCall(`/api/notifications/${id}/read`, { method: "POST" })
-  }
+  },
 
-};
+    /* ======================
+       USER
+    ====================== */
+    user: {
+      uploadProfilePhoto: (formData) =>
+        apiCall("/api/user/profile-photo", {
+          method: "POST",
+          body: formData,
+          // Note: Browser sets Content-Type to multipart/form-data with boundary when body is FormData
+          headers: {} 
+        })
+    }
+  };
 
 /* ===========================================================
    AUTH HELPERS

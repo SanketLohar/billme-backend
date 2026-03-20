@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../src/global.css">
+    <script src="../src/api.js"></script>
+    <script src="../src/auth.js"></script>
     <script src="../src/i18n.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -219,6 +221,26 @@
 
             <!-- ══ SETTINGS SECTION ══ -->
             <div class="section-page" id="sec-settings">
+                <!-- Profile Photo Card -->
+                <div class="card mb-4">
+                    <div class="card-header"><h3>Admin Profile Photo</h3></div>
+                    <div style="padding:20px; display:flex; align-items:center; gap:24px;">
+                        <div class="topbar-avatar" id="profile-preview-container" style="width:100px; height:100px; font-size:40px; background: var(--gradient); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div class="form-group mb-2">
+                                <label class="form-label">Update Profile Picture</label>
+                                <input type="file" id="p-photo-input" class="form-input" accept="image/*" style="padding: 8px; width: 100%;">
+                                <div class="form-hint">JPG, PNG or GIF. Max 5MB.</div>
+                            </div>
+                            <button class="btn btn-primary btn-sm" id="uploadPhotoBtn" disabled>
+                                <i class="fas fa-upload"></i> Upload Photo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header"><h3>Admin Settings</h3></div>
                     <div style="padding:20px; text-align:center; color:var(--text-secondary);">

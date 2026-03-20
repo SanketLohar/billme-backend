@@ -31,6 +31,7 @@ public class CustomerController {
                 .id(profile.getId())
                 .name(profile.getName())
                 .email(profile.getUser().getEmail())
+                .profileImageUrl(profile.getUser().getProfileImageUrl())
                 .build();
     }
 

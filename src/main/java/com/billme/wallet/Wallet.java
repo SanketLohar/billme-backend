@@ -26,9 +26,11 @@ public class Wallet {
     private User user;
 
 
+    @Builder.Default
     @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
 
+    @Builder.Default
     @Column(nullable = false)
     private BigDecimal escrowBalance = BigDecimal.ZERO;
 

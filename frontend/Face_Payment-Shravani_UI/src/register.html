@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="global.css">
+    <script src="api.js"></script>
+    <script src="auth.js"></script>
     <script src="i18n.js" defer></script>
 
 
@@ -644,7 +646,6 @@
 
 <div id="toast-container" class="toast-container"></div>
 
-<script src="api.js"></script>
 <script>
 // ════════════════════════════════════════════════════════════
 //  BillMe Registration — register.html
@@ -748,8 +749,7 @@ document.getElementById('merchantForm').addEventListener('submit', async functio
         };
 
         const res = await API.auth.registerMerchant(payload);
-        saveAuthResponse(res);
-        setRole('MERCHANT');
+        Auth.login(res.accessToken, res.refreshToken || "", "MERCHANT", res.userId);
 
         // Show success
         document.getElementById('merchantForm').style.display = 'none';
@@ -855,11 +855,21 @@ function updateInstruction() {
 
 async function startCamera() {
     try {
+        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        document.getElementById('faceInstruction').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading AI Models...';
+        
+        await Promise.all([
+            faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]);
+
         videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
         document.getElementById('faceVideo').srcObject = videoStream;
         updateInstruction();
     } catch(err) {
-        showToast('Camera access denied. Face registration requires camera.', 'error');
+        console.error(err);
+        showToast('Camera or AI Model error.', 'error');
     }
 }
 
@@ -870,25 +880,55 @@ function stopCamera() {
     }
 }
 
-document.getElementById('captureBtn').addEventListener('click', () => {
+document.getElementById('captureBtn').addEventListener('click', async () => {
     const pose = POSES[currentPoseIdx];
     if (!pose) return;
 
     const video = document.getElementById('faceVideo');
+    const captureBtn = document.getElementById('captureBtn');
+    
+    // UI state
+    captureBtn.disabled = true;
+    captureBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+
     const canvas = document.createElement('canvas');
     canvas.width  = video.videoWidth  || 320;
     canvas.height = video.videoHeight || 240;
     canvas.getContext('2d').drawImage(video, 0, 0);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
 
-    capturedPoses[pose.key] = dataUrl;
+    try {
+        const detection = await faceapi.detectSingleFace(canvas).withFaceLandmarks().withFaceDescriptor();
+        
+        if (!detection) {
+            showToast('No face detected. Please adjust lighting or position.', 'warning');
+            captureBtn.disabled = false;
+            captureBtn.innerHTML = '<i class="fas fa-camera"></i> Capture';
+            return;
+        }
 
-    const cell = document.getElementById(`pose-${pose.key}`);
-    cell.classList.add('captured');
-    cell.innerHTML = `<img src="${dataUrl}" alt="${pose.label}"><span class="pose-label">${pose.label} ✓</span>`;
+        // Store the numerical descriptor, not the image URL
+        capturedPoses[pose.key] = Array.from(detection.descriptor);
 
-    currentPoseIdx++;
-    updateInstruction();
+        const cell = document.getElementById(`pose-${pose.key}`);
+        cell.classList.add('captured');
+        cell.innerHTML = `<img src="${dataUrl}" alt="${pose.label}"><span class="pose-label">${pose.label} ✓</span>`;
+
+        currentPoseIdx++;
+        updateInstruction();
+        
+    } catch (err) {
+        console.error(err);
+        showToast('Processing error. Try again.', 'error');
+    } finally {
+        if (currentPoseIdx < POSES.length) {
+            captureBtn.disabled = false;
+            captureBtn.innerHTML = '<i class="fas fa-camera"></i> Capture';
+        } else {
+            captureBtn.disabled = true;
+            captureBtn.innerHTML = '<i class="fas fa-check"></i> All Captured';
+        }
+    }
 });
 
 document.getElementById('restartCapture').addEventListener('click', () => {
@@ -918,8 +958,21 @@ document.getElementById('customerForm').addEventListener('submit', async functio
     document.getElementById('c-global-err').style.display = 'none';
 
     try {
-        // Convert captured poses to a serializable format
-        const faceEmbeddings = JSON.stringify(capturedPoses);
+        // Average the 6 poses for a robust biometric template
+        const poses = Object.values(capturedPoses);
+        const dimension = poses[0].length; // should be 128
+        const avgDescriptor = new Float32Array(dimension).fill(0);
+
+        for (const desc of poses) {
+            for (let i = 0; i < dimension; i++) {
+                avgDescriptor[i] += desc[i];
+            }
+        }
+        for (let i = 0; i < dimension; i++) {
+            avgDescriptor[i] /= poses.length;
+        }
+
+        const faceEmbeddings = JSON.stringify(Array.from(avgDescriptor));
 
         const payload = {
             email:         fieldVal('c-email'),
@@ -935,8 +988,7 @@ document.getElementById('customerForm').addEventListener('submit', async functio
         };
 
         const res = await API.auth.registerCustomer(payload);
-        saveAuthResponse(res);
-        setRole('CUSTOMER');
+        Auth.login(res.accessToken, res.refreshToken || "", "CUSTOMER", res.userId);
 
         stopCamera();
         document.getElementById('customerForm').style.display = 'none';

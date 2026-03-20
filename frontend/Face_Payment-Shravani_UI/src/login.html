@@ -11,8 +11,9 @@
         rel="stylesheet">
     <link rel="stylesheet" href="global.css">
     <!-- <!-- <script src="translations.js" defer></script> --> -->
+    <script src="api.js"></script>
+    <script src="auth.js"></script>
     <script src="i18n.js" defer></script>
-    <script src="api.js" defer></script>
     <style>
         *,
         *::before,
@@ -547,93 +548,72 @@
 
     <script>
 
-/* =========================
-   ERROR HANDLING
-========================= */
-function showError(msg) {
-    const toast = document.getElementById("errorToast");
-    const errorMsg = document.getElementById("errorMsg");
+        /* =========================
+           ERROR HANDLING
+        ========================= */
+        function showError(msg) {
+            const toast = document.getElementById("errorToast");
+            const errorMsg = document.getElementById("errorMsg");
 
-    if (toast && errorMsg) {
-        errorMsg.innerText = msg;
-        toast.classList.add("show");
-        setTimeout(() => toast.classList.remove("show"), 5000);
-    }
-}
-
-/* =========================
-   LOGIN FORM
-========================= */
-document.getElementById("loginForm").addEventListener("submit", async function (e) {
-
-    e.preventDefault();
-
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
-    const btn = document.getElementById("submitBtn");
-
-    if (!email || !password) {
-        showError("Please fill in all fields.");
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in…';
-
-    try {
-
-        const data = await window.API.auth.login({ email, password });
-
-        console.log("LOGIN RESPONSE:", data);
-
-        if (!data || !data.accessToken) {
-            throw new Error("Invalid login response from server");
+            if (toast && errorMsg) {
+                errorMsg.innerText = msg;
+                toast.classList.add("show");
+                setTimeout(() => toast.classList.remove("show"), 5000);
+            }
         }
 
         /* =========================
-           SAVE AUTH DATA
+           LOGIN FORM
         ========================= */
+        document.getElementById("loginForm").addEventListener("submit", async function (e) {
 
-        localStorage.setItem("billme_token", data.accessToken);
+            e.preventDefault();
 
-        if (data.role) {
-            localStorage.setItem("billme_role", data.role.toLowerCase());
-        }
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+            const btn = document.getElementById("submitBtn");
 
-        if (data.userId) {
-            localStorage.setItem("billme_user_id", data.userId);
-        }
+            if (!email || !password) {
+                showError("Please fill in all fields.");
+                return;
+            }
 
-        /* =========================
-           REDIRECT
-        ========================= */
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in…';
 
-        const role = (data.role || "").toLowerCase();
-        if (role === "admin") {
-            window.location.href = "../dashboard/Admin.html";
-        } else if (role === "merchant") {
-            window.location.href = "../dashboard/merchant.html";
-        } else if (role === "customer") {
-            window.location.href = "../dashboard/customer.html";
-        } else {
-            window.location.href = "../dashboard/merchant.html";
-        }
+            try {
 
-    } catch (err) {
+                const data = await window.API.auth.login({ email, password });
 
-        console.error("Login error:", err);
-        showError(err.message || "Login failed.");
+                console.log("LOGIN RESPONSE:", data);
 
-    } finally {
+                if (!data || !data.accessToken) {
+                    throw new Error("Invalid login response from server");
+                }
 
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+                /* =========================
+                   SAVE AUTH DATA
+                ========================= */
 
-    }
+                localStorage.setItem("billme_token", data.accessToken);
+                Auth.login(data.accessToken, data.refreshToken, data.role, data.userId);
+                Auth.initAuth();
 
-});
+            } catch (err) {
 
-</script>
+                console.error("Login error:", err);
+                showError(err.message || "Login failed.");
+
+            } finally {
+
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+
+            }
+
+        });
+
+    </script>
 </body>
 
 </html>
