@@ -271,6 +271,10 @@ const API = {
       apiCall(`/api/payments/refund/reject/${invoiceId}`, {
         method: "POST"
       }),
+    retryPayment: (invoiceId) =>
+      apiCall(`/api/payments/retry/${invoiceId}`, {
+        method: "POST"
+      }),
   },
 
   /* ======================

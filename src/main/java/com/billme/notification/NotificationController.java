@@ -1,5 +1,6 @@
 package com.billme.notification;
 
+import com.billme.notification.dto.NotificationResponse;
 import com.billme.user.User;
 import com.billme.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ public class NotificationController {
     private final UserRepository userRepository;
 
     @GetMapping
-    public ResponseEntity<List<Notification>> getNotifications(Authentication auth) {
+    public ResponseEntity<List<NotificationResponse>> getNotifications(Authentication auth) {
         User user = userRepository.findByEmail(auth.getName()).orElseThrow();
         return ResponseEntity.ok(notificationService.getUserNotifications(user));
     }

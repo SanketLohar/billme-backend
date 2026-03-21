@@ -1,27 +1,33 @@
 package com.billme.payment;
 
-import com.billme.email.PaymentSuccessEmailService;
 import com.billme.invoice.Invoice;
 import com.billme.invoice.InvoiceStatus;
 import com.billme.repository.InvoiceRepository;
 import com.billme.repository.TransactionRepository;
+import com.billme.repository.WalletRepository;
+import com.billme.transaction.LedgerEntryType;
+import com.billme.transaction.LedgerService;
 import com.billme.transaction.Transaction;
 import com.billme.transaction.TransactionStatus;
 import com.billme.transaction.TransactionType;
 import com.billme.wallet.Wallet;
 import com.billme.notification.NotificationService;
-import com.billme.wallet.WalletService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.billme.invoice.PaymentMethod;
+import com.billme.wallet.WalletService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentSettlementService {
 
     private final WalletService walletService;
@@ -30,79 +36,76 @@ public class PaymentSettlementService {
     private final NotificationService notificationService;
 
     @Transactional
-    public void settlePayment(Invoice invoice, BigDecimal customerPayment, String paymentId) {
+    public void settlePayment(Long invoiceId, String externalRef) {
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
-        // -----------------------------
-        // 1. Idempotency Protection
-        // -----------------------------
+        log.info("🚀 [SETTLEMENT START] Invoice: {} | Method: {} | Ref: {}", 
+                invoice.getInvoiceNumber(), invoice.getPaymentMethod(), externalRef);
+
+        // 1. Idempotency & Safety Guards
         if (invoice.getStatus() == InvoiceStatus.PAID) {
-            System.out.println("⚠️ [IDEMPOTENCY] Invoice " + invoice.getInvoiceNumber() + " already paid. Skipping.");
+            log.warn("⚠️ [IDEMPOTENCY] Invoice {} already paid. Skipping settlement.", invoice.getInvoiceNumber());
             return;
         }
 
-        if (customerPayment == null) {
-            throw new IllegalArgumentException("Customer payment amount missing");
+        BigDecimal amount = (invoice.getTotalPayable() != null) ? invoice.getTotalPayable() : invoice.getAmount();
+        BigDecimal processingFee = (invoice.getProcessingFee() != null) ? invoice.getProcessingFee() : BigDecimal.ZERO;
+        BigDecimal merchantSettlement = amount.subtract(processingFee);
+
+        // 2. Branch Settlement by Payment Method
+        if (invoice.getPaymentMethod() == PaymentMethod.FACE_PAY) {
+            log.info("💳 [FACE_PAY] Executing internal wallet transfer");
+            walletService.updateBalanceInternal(
+                    invoice.getCustomer().getUser(),
+                    invoice.getMerchant().getUser(),
+                    amount,
+                    externalRef
+            );
+        } else if (invoice.getPaymentMethod() == PaymentMethod.UPI_PAY || invoice.getPaymentMethod() == PaymentMethod.CARD) {
+            log.info("🌐 [{}] Executing external settlement (No customer debit)", invoice.getPaymentMethod());
+            walletService.updateBalanceExternal(
+                    invoice.getMerchant().getUser(),
+                    amount,
+                    externalRef
+            );
+        } else {
+            throw new IllegalStateException("Unsupported payment method for settlement: " + invoice.getPaymentMethod());
         }
 
-        // -----------------------------
-        // 2. Financial Reconciliation Guard
-        // -----------------------------
-        BigDecimal totalPayable = invoice.getTotalPayable();
-        BigDecimal processingFee = invoice.getProcessingFee();
+        TransactionType type = (invoice.getPaymentMethod() == PaymentMethod.FACE_PAY) 
+                ? TransactionType.FACE_PAY 
+                : TransactionType.UPI_PAY;
 
-        if (totalPayable == null || processingFee == null) {
-            throw new IllegalStateException("Invoice financial data corrupted");
-        }
-
-        if (customerPayment.compareTo(totalPayable) != 0) {
-            throw new IllegalStateException("Payment mismatch. Expected: " + totalPayable + " Got: " + customerPayment);
-        }
-
-        BigDecimal merchantSettlement = totalPayable.subtract(processingFee);
-
-        // -----------------------------
-        // 3. Atomic Wallet Transfer (Customer -> Merchant Escrow)
-        // -----------------------------
-        // This call is atomic and protected by pessimistic locks inside transferFunds
-        walletService.transferFunds(
-                invoice.getCustomer().getUser(),
-                invoice.getMerchant().getUser(),
-                customerPayment,
-                paymentId
-        );
-
-        // -----------------------------
-        // 4. Ledger Transaction & Invoice Update
-        // -----------------------------
+        // 3. Create Transaction Ledger
         Transaction ledgerTransaction = Transaction.builder()
-                .senderWallet(null) // Generic ledger for now
+                .senderWallet(null) 
                 .receiverWallet(null)
-                .amount(customerPayment)
-                .invoiceAmount(totalPayable)
+                .amount(amount)
+                .invoiceAmount(amount)
                 .processingFee(processingFee)
                 .merchantSettlement(merchantSettlement)
-                .transactionType(TransactionType.INVOICE_PAYMENT)
+                .transactionType(type)
                 .status(TransactionStatus.SUCCESS)
-                .externalReference(paymentId)
+                .externalReference(externalRef)
                 .createdAt(LocalDateTime.now())
+                .invoice(invoice)
                 .build();
 
         transactionRepository.save(ledgerTransaction);
 
+        // 4. Update Invoice Status
         invoice.setStatus(InvoiceStatus.PAID);
         invoice.setTransaction(ledgerTransaction);
         invoice.setPaidAt(LocalDateTime.now());
         invoice.setPaymentInProgress(false);
         invoice.setRefundWindowExpiry(LocalDateTime.now().plusDays(3));
 
-        invoiceRepository.save(invoice);
+        invoiceRepository.saveAndFlush(invoice);
 
-        System.out.println("✅ [PAYMENT SETTLED] Invoice: " + invoice.getInvoiceNumber() + " Ref: " + paymentId);
+        log.info("✅ [SETTLEMENT SUCCESS] Invoice: {} | Method: {}", invoice.getInvoiceNumber(), invoice.getPaymentMethod());
 
-        // -----------------------------
-        // 5. Trigger Notifications
-        // -----------------------------
-        // notificationService will handle in-app and async emails
+        // 5. Notifications
         notificationService.sendPaymentNotifications(invoice);
     }
-}
+}

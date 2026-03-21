@@ -57,7 +57,7 @@ async function fetchNotifications() {
 window.toggleNotifications = function() {
     const dropdown = document.getElementById('notifDropdown');
     if (dropdown) {
-        dropdown.classList.toggle('show');
+        dropdown.classList.toggle('active');
     }
 };
 

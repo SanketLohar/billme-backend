@@ -162,6 +162,8 @@ function renderInvoices(invoices) {
         
         if (status === 'UNPAID') {
             actionsHtml += `<button class="btn btn-primary btn-sm" onclick="payInvoice('${inv.invoiceNumber}', '${inv.paymentToken}')">Pay Now</button>`;
+        } else if (status === 'PENDING' || status === 'FAILED') {
+            actionsHtml += `<button class="btn btn-warning btn-sm" onclick="retryPayment('${invoiceId}')" title="Retry Payment"><i class="fas fa-redo"></i> Retry</button>`;
         } else if (status === 'PAID') {
             const now = new Date();
             const expiry = inv.refundWindowExpiry ? new Date(inv.refundWindowExpiry) : null;
@@ -250,6 +252,32 @@ window.payInvoice = function(invoiceNumber, token) {
         return;
     }
     window.location.href = `../pay-invoice.html?num=${invoiceNumber}&token=${token}`;
+};
+
+window.retryPayment = async function(invoiceId) {
+    if (!invoiceId || invoiceId === 'undefined') {
+        if (window.API && window.API.showToast) window.API.showToast('Invalid Invoice ID', 'error');
+        return;
+    }
+
+    try {
+        if (window.API && window.API.showToast) window.API.showToast('Refreshing payment session...', 'info');
+        const orderId = await window.API.payment.retryPayment(invoiceId);
+        if (window.API && window.API.showToast) window.API.showToast('Payment session refreshed. Redirecting...', 'success');
+        
+        // Find the invoice details to get the number and token
+        const invoices = await window.API.customer.getInvoices();
+        const inv = invoices.find(i => (i.id || i.invoiceId).toString() === invoiceId.toString());
+        
+        if (inv) {
+            window.location.href = `../pay-invoice.html?num=${inv.invoiceNumber}&token=${inv.paymentToken}`;
+        } else {
+            window.location.reload();
+        }
+    } catch (err) {
+        console.error('Retry failed:', err);
+        if (window.API && window.API.showToast) window.API.showToast(err.message || 'Failed to retry payment', 'error');
+    }
 };
 
 window.requestRefund = async function(invoiceId) {

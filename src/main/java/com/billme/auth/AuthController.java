@@ -7,6 +7,7 @@ import com.billme.auth.token.RefreshTokenService;
 import com.billme.security.jwt.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -114,4 +115,9 @@ public class AuthController {
 
         return ResponseEntity.ok(user);
     }
+
+//    @GetMapping("/dev/hash")
+//    public String hash() {
+//        return new BCryptPasswordEncoder().encode("123456");
+//    }
 }

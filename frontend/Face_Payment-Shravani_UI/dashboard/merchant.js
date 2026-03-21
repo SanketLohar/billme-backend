@@ -47,6 +47,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const lang = localStorage.getItem('billme_lang') || 'en';
         window.applyTranslations(lang);
     }
+
+    // 🔄 Auto-refresh dashboard stats every 60 seconds for "real-time" feel
+    setInterval(() => {
+        console.log("🔄 Auto-refreshing dashboard stats...");
+        loadDashboard();
+    }, 60000);
 });
 
 // ── Error Handling Utilities ──────────────────────────────────
@@ -196,12 +202,6 @@ function renderStatCards(products, invoices, balanceSheet, wallet) {
     if (bstNet) {
         const net = revenue + escrow - withdrawals - fees;
         bstNet.textContent = net.toFixed(2);
-    }
-
-    if (balance > 0 || escrow > 0 || revenue > 0) {
-        document.querySelectorAll('.financial-pending').forEach(el => el.style.display = 'none');
-    } else {
-        document.querySelectorAll('.financial-pending').forEach(el => el.style.display = 'block');
     }
 }
 

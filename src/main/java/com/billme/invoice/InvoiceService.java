@@ -22,7 +22,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.billme.wallet.Wallet;
 import com.billme.wallet.WalletService;
+import com.billme.payment.PaymentSettlementService;
 import org.springframework.web.server.ResponseStatusException;
+import com.billme.notification.NotificationService; // Explicitly import NotificationService
+import com.billme.notification.NotificationType;
+import lombok.extern.slf4j.Slf4j; // Add this import for logging
+import org.springframework.transaction.annotation.Isolation; // For strict transaction isolation
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -33,6 +38,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j // Add this annotation for logging
 public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
@@ -44,7 +50,9 @@ public class InvoiceService {
     private final InvoiceEmailService invoiceEmailService;
     private final WalletService walletService;
     private final InvoicePdfService invoicePdfService;
-    private final com.billme.notification.NotificationService notificationService;
+    private final NotificationService notificationService;
+    private final TransactionRepository transactionRepository;
+    private final PaymentSettlementService paymentSettlementService;
     @Value("${processing.fee.percent}")
     private BigDecimal processingFeePercent;
 
@@ -73,6 +81,15 @@ public class InvoiceService {
         
         invoice.setPaymentToken(generatePaymentToken());
         Invoice savedInvoice = invoiceRepository.save(invoice);
+        
+        // 🔔 In-App Notification (BEST EFFORT)
+        if (savedInvoice.getCustomer() != null && savedInvoice.getCustomer().getUser() != null) {
+            String msg = String.format("A new invoice #%s for ₹%s has been created for you by %s.",
+                    savedInvoice.getInvoiceNumber(), savedInvoice.getTotalPayable(), savedInvoice.getMerchant().getBusinessName());
+            notificationService.createNotification(savedInvoice.getCustomer().getUser(), msg, NotificationType.INVOICE_CREATED);
+            log.info("🔔 [NOTIFICATION] In-app notification created for new Invoice {}", savedInvoice.getInvoiceNumber());
+        }
+
         invoice.setDueDate(LocalDate.now().plusDays(7)); // default 7 days
         invoiceEmailService.sendInvoiceEmail(savedInvoice);
     }
@@ -100,6 +117,15 @@ public class InvoiceService {
         invoice.setPaymentToken(generatePaymentToken());
 
         invoiceRepository.save(invoice);
+        
+        // 🔔 In-App Notification (BEST EFFORT)
+        if (invoice.getCustomer() != null && invoice.getCustomer().getUser() != null) {
+            String msg = String.format("A new invoice #%s for ₹%s has been created for you by %s.",
+                    invoice.getInvoiceNumber(), invoice.getTotalPayable(), invoice.getMerchant().getBusinessName());
+            notificationService.createNotification(invoice.getCustomer().getUser(), msg, NotificationType.INVOICE_CREATED);
+            log.info("🔔 [NOTIFICATION] In-app notification created for Invoice {}", invoice.getInvoiceNumber());
+        }
+
         invoiceEmailService.sendInvoiceEmail(invoice);
     }
 
@@ -457,91 +483,99 @@ public class InvoiceService {
             throw new RuntimeException("Invoice is not payable");
         }
 
-        CustomerProfile customer = invoice.getCustomer();
-        MerchantProfile merchant = invoice.getMerchant();
-
-        // Fetch wallets
-        Wallet customerWallet = customer.getUser().getWallet();
-        Wallet merchantWallet = merchant.getUser().getWallet();
-
-        BigDecimal customerPayment = invoice.getTotalPayable();
-        BigDecimal processingFee = invoice.getProcessingFee();
-        BigDecimal merchantSettlement = customerPayment.subtract(processingFee);
-
-        if (!customerPayment.equals(merchantSettlement.add(processingFee))) {
-            throw new IllegalStateException("Financial reconciliation failed");
-        }
-
-        if (customerWallet.getBalance().compareTo(customerPayment) < 0) {
-            throw new RuntimeException("Insufficient wallet balance");
-        }
-
-        String referenceId = "FACEPAY-" + invoice.getInvoiceNumber();
-
-        walletService.debit(customerWallet, customerPayment, referenceId);
-        walletService.creditEscrow(merchantWallet, merchantSettlement, referenceId);
-
-        Transaction transaction = Transaction.builder()
-                .senderWallet(customerWallet)
-                .receiverWallet(merchantWallet)
-                .amount(customerPayment)
-                .invoiceAmount(customerPayment)
-                .processingFee(processingFee)
-                .merchantSettlement(merchantSettlement)
-                .transactionType(TransactionType.FACE_PAY)
-                .status(TransactionStatus.SUCCESS)
-                .createdAt(LocalDateTime.now())
-                .build();
-        invoice.setTransaction(transaction);
+        // Set FacePay method for settlement
         invoice.setPaymentMethod(PaymentMethod.FACE_PAY);
+        invoiceRepository.saveAndFlush(invoice);
 
-        // 🔒 State machine enforcement
-        validateStatusTransition(invoice, InvoiceStatus.PAID);
-
-        invoice.setStatus(InvoiceStatus.PAID);
-        invoice.setPaidAt(java.time.LocalDateTime.now());
+        // 🔥 Centralized Settlement Logic
+        paymentSettlementService.settlePayment(invoiceId, "FACEPAY-" + invoice.getInvoiceNumber());
     }
     @Transactional
     public String createRazorpayOrder(Long invoiceId) {
 
         Invoice invoice = invoiceRepository.findById(invoiceId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
 
-        if (invoice.getStatus() != InvoiceStatus.UNPAID &&
-                invoice.getStatus() != InvoiceStatus.PENDING) {
-            throw new RuntimeException("Only unpaid invoices can be paid");
+        // ❌ BLOCK if already paid
+        if (invoice.getStatus() == InvoiceStatus.PAID) {
+            log.warn("❌ [RETRY BLOCKED] Invoice {} already PAID", invoice.getInvoiceNumber());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment already completed for this invoice");
         }
 
-        // 🔥 Payment lock check
+        // ❌ BLOCK if not in PENDING or UNPAID or FAILED
+        if (invoice.getStatus() != InvoiceStatus.UNPAID &&
+                invoice.getStatus() != InvoiceStatus.PENDING &&
+                invoice.getStatus() != InvoiceStatus.FAILED) {
+            log.warn("❌ [RETRY BLOCKED] Invoice {} status {} not eligible", invoice.getInvoiceNumber(), invoice.getStatus());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice status is not eligible for payment");
+        }
+
+        // 🔥 Payment lock check - Sensed that we already have an active session?
         if (Boolean.TRUE.equals(invoice.getPaymentInProgress())) {
 
-            // Check timeout
+            // 1. If we already have a Razorpay Order ID, just return it (Reuse)
+            if (invoice.getRazorpayOrderId() != null) {
+                log.info("♻️ [ORDER REUSE] Returning existing Razorpay order: {} for Invoice: {}",
+                        invoice.getRazorpayOrderId(), invoice.getInvoiceNumber());
+                return invoice.getRazorpayOrderId();
+            }
+
+            // 2. If no order ID but lock is old, release it
             if (invoice.getPaymentStartedAt() != null &&
                     invoice.getPaymentStartedAt().isBefore(LocalDateTime.now().minusMinutes(10))) {
 
-                // 🔥 release stale payment lock
+                log.info("🕒 [LOCK RELEASED] Releasing stagnant lock for Invoice: {}", invoice.getInvoiceNumber());
                 invoice.setPaymentInProgress(false);
                 invoice.setPaymentStartedAt(null);
-
-                // 🔥 clear old Razorpay order
                 invoice.setRazorpayOrderId(null);
-
-                // 🔥 reset invoice state
-                invoice.setStatus(InvoiceStatus.UNPAID);
             } else {
-                throw new RuntimeException("Payment already in progress");
+                // 3. Otherwise, block (this is the true race condition guard)
+                log.warn("⏳ [PAYMENT BLOCKED] Payment already in progress for Invoice: {}", invoice.getInvoiceNumber());
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment already in progress. Please wait.");
             }
         }
 
-        invoice.setPaymentInProgress(true);
-        invoice.setPaymentStartedAt(LocalDateTime.now());
+        // 🚀 Create New Order
+        log.info("💳 [ORDER START] Creating Razorpay order for Invoice: {} | Status: {}",
+                invoice.getInvoiceNumber(), invoice.getStatus());
 
         var order = razorpayService.createOrder(invoice);
 
         invoice.setRazorpayOrderId(order.get("id"));
         invoice.setStatus(InvoiceStatus.PENDING);
+        invoice.setPaymentInProgress(true);
+        invoice.setPaymentStartedAt(LocalDateTime.now());
 
-        return order.get("id");
+        log.info("✅ [ORDER CREATED] ID: {} for Invoice: {}", invoice.getRazorpayOrderId(), invoice.getInvoiceNumber());
+
+        return invoice.getRazorpayOrderId();
+    }
+
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public String retryPayment(Long invoiceId) {
+        log.info("🔁 [RETRY TRIGGERED] Manual retry for Invoice ID: {}", invoiceId);
+
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
+
+        // 1. Validate Status - BLOCK if PAID
+        if (invoice.getStatus() == InvoiceStatus.PAID) {
+            log.warn("❌ [RETRY BLOCKED] Invoice {} is already PAID", invoice.getInvoiceNumber());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice is already paid");
+        }
+
+        // 2. CRITICAL: Force Reset of Payment Lock
+        log.info("🧹 [CLEANUP] Resetting paymentInProgress and clearing old Razorpay data for Invoice: {}", invoice.getInvoiceNumber());
+        invoice.setPaymentInProgress(false);
+        invoice.setRazorpayOrderId(null);
+        invoice.setPaymentStartedAt(null);
+
+        // 🔥 Save flush to ensure DB state is clean BEFORE next step
+        invoiceRepository.saveAndFlush(invoice);
+        log.info("✅ [RESET SUCCESS] paymentInProgress set to FALSE for Invoice: {}", invoice.getInvoiceNumber());
+
+        // 3. Create fresh order
+        return createRazorpayOrder(invoiceId);
     }
 
     @Transactional(readOnly = true)
@@ -596,17 +630,19 @@ public class InvoiceService {
         Invoice invoice = invoiceRepository.findByRazorpayOrderId(request.getRazorpay_order_id())
                 .orElseThrow(() -> new RuntimeException("Invoice not found for order ID: " + request.getRazorpay_order_id()));
 
-        // Verification logic (Simplified for stabilization)
-        // In production, we'd use Razorpay SDK: Utils.verifyPaymentSignature(attributes, secret)
-        
-        invoice.setStatus(InvoiceStatus.PAID);
-        invoice.setPaidAt(LocalDateTime.now());
-        invoice.setPaymentMethod(com.billme.invoice.PaymentMethod.UPI_PAY); 
+        if (invoice.getStatus() == InvoiceStatus.PAID) {
+            log.info("⚠️ [IDEMPOTENCY] Invoice {} already paid. Skipping settlement.", invoice.getInvoiceNumber());
+            return;
+        }
+
+        // Set UPI method for settlement
+        invoice.setPaymentMethod(PaymentMethod.UPI_PAY);
         invoice.setPaymentInProgress(false);
-        
-        invoiceRepository.save(invoice);
-        
-        // 📢 Trigger Notifications
-        notificationService.sendPaymentNotifications(invoice);
+        invoiceRepository.saveAndFlush(invoice);
+
+        // 🔥 Centralized Settlement Logic
+        paymentSettlementService.settlePayment(invoice.getId(), request.getRazorpay_payment_id());
+
+        log.info("✅ [UPI SETTLED] Invoice: {} verified via Razorpay.", invoice.getInvoiceNumber());
     }
 }

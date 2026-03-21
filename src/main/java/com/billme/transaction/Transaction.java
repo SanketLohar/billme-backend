@@ -14,7 +14,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "transactions")
+@Table(name = "transactions", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"external_reference", "transaction_type"})
+})
 public class Transaction {
 
     @Id
@@ -39,6 +41,7 @@ public class Transaction {
     private BigDecimal merchantSettlement;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "transaction_type")
     private TransactionType transactionType;
 
     @Enumerated(EnumType.STRING)
@@ -48,6 +51,7 @@ public class Transaction {
     @JoinColumn(name = "invoice_id")   // ✅ NEW
     private Invoice invoice;
 
+    @Column(name = "external_reference")
     private String externalReference; // for UPI txn id
 
     private LocalDateTime createdAt;

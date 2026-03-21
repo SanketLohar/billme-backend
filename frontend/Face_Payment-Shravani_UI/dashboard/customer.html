@@ -75,12 +75,7 @@
             transition: margin 0.3s;
         }
 
-        .topbar {
-            height: var(--topbar-height);
-            background: #fff; border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 28px; position: sticky; top: 0; z-index: 90;
-        }
+        .topbar__title { font-size: 20px; font-weight: 700; }
         .topbar__title { font-size: 20px; font-weight: 700; }
 
         .page-area { padding: 28px; flex: 1; }
@@ -144,11 +139,13 @@
     </aside>
 
     <main class="main-content">
-        <div class="topbar">
-            <div class="topbar__title" id="pageTitle">Overview</div>
-            <div class="topbar__right">
-                <!-- NEW: Notifications Bell -->
-                <div class="notification-container" style="position:relative; margin-right: 16px; cursor: pointer;" id="notificationBell" onclick="toggleNotifications()">
+        <div class="dashboard-topbar">
+            <div class="topbar-left">
+                <div class="topbar-title" id="pageTitle">Overview</div>
+            </div>
+            <div class="topbar-right">
+                <!-- Notifications Bell -->
+                <div class="notification-container" style="position:relative; cursor: pointer;" id="notificationBell" onclick="toggleNotifications()">
                     <i class="fas fa-bell" style="font-size: 20px; color: var(--text-secondary);"></i>
                     <span id="notifBadge" style="display:none; position:absolute; top:-6px; right:-8px; background:var(--danger); color:white; font-size:10px; font-weight:bold; padding:2px 5px; border-radius:10px;">0</span>
                     <div class="language-dropdown" id="notifDropdown" style="width: 320px; right: 0; padding: 10px; max-height: 400px; overflow-y: auto;">
@@ -158,7 +155,7 @@
                 </div>
 
                 <!-- Language Switcher -->
-                <div class="language-dropdown-container" style="margin-right:20px;">
+                <div class="language-dropdown-container">
                     <div class="language-switcher" onclick="toggleLangDropdown()">
                         <i class="fas fa-globe"></i>
                         <span id="current-lang">EN</span>
@@ -170,6 +167,8 @@
                         <div class="lang-option" onclick="setLanguage('mr')">मराठी (MR)</div>
                     </div>
                 </div>
+
+                <div class="topbar-avatar" id="topbarAvatar">C</div>
             </div>
         </div>
 

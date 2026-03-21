@@ -93,10 +93,6 @@ public class RazorpayWebhookService {
         invoiceRepository.save(invoice);
 
         // final settlement
-        settlementService.settlePayment(
-                invoice,
-                invoice.getTotalPayable(),
-                paymentId
-        );
+        settlementService.settlePayment(invoice.getId(), paymentId);
     }
 }

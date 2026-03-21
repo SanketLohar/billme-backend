@@ -17,6 +17,7 @@ import com.billme.notification.NotificationService;
 import com.billme.notification.NotificationType;
 import com.billme.email.RefundEmailService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,8 +26,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import com.billme.repository.UserRepository;
 import com.billme.repository.WalletRepository;
+
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RefundService {
 
     private final InvoiceRepository invoiceRepository;
@@ -83,21 +86,10 @@ public class RefundService {
         invoice.setStatus(InvoiceStatus.REFUND_REQUESTED);
         invoiceRepository.save(invoice);
 
-        // Notify Customer
-        User customerUser = invoice.getCustomer().getUser();
-        notificationService.createNotification(
-                customerUser,
-                "Refund request submitted for Invoice " + invoice.getInvoiceNumber(),
-                NotificationType.INFO
-        );
+        // 🔔 Centralized Notifications (In-App)
+        notificationService.sendRefundRequestNotifications(invoice);
 
-        // Notify Merchant
         User merchantUser = invoice.getMerchant().getUser();
-        notificationService.createNotification(
-                merchantUser,
-                "Refund request received for Invoice " + invoice.getInvoiceNumber(),
-                NotificationType.REFUND_REQUESTED
-        );
 
         // Send Email
         String approveToken = refundTokenService.generateRefundToken(invoice.getId(), invoice.getMerchant().getId());
@@ -125,96 +117,95 @@ public class RefundService {
 
         invoice.setStatus(InvoiceStatus.REFUND_REJECTED);
         invoiceRepository.save(invoice);
+
+        // Notify Customer
+        if (invoice.getCustomer() != null && invoice.getCustomer().getUser() != null) {
+            String msg = "Your refund request for Invoice " + invoice.getInvoiceNumber() + " was rejected by the merchant.";
+            notificationService.createNotification(invoice.getCustomer().getUser(), msg, NotificationType.ERROR);
+            refundEmailService.sendRefundRejectedEmail(invoice.getCustomer().getUser().getEmail(), invoice.getInvoiceNumber(), "Merchant policy / already processed.");
+        }
+
+        // Notify Merchant
+        String merchantMsg = "You rejected the refund request for Invoice " + invoice.getInvoiceNumber();
+        notificationService.createNotification(invoice.getMerchant().getUser(), merchantMsg, NotificationType.INFO);
     }
 
     @Transactional
     public void refundInvoice(Long invoiceId) {
-
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
-        // 🔒 Must be PAID or REFUND_REQUESTED
+        // 1. Idempotency & Eligibility Guard
+        if (invoice.getStatus() == InvoiceStatus.REFUNDED) {
+            log.warn("⚠️ [IDEMPOTENCY] Invoice {} already refunded. Skipping.", invoice.getInvoiceNumber());
+            return;
+        }
+
         if (invoice.getStatus() != InvoiceStatus.PAID && invoice.getStatus() != InvoiceStatus.REFUND_REQUESTED) {
             throw new RuntimeException("Only paid or refund-requested invoices can be refunded");
         }
 
-        // 🔒 Must be inside refund window
+        // 2. Window Check
         if (invoice.getRefundWindowExpiry() == null ||
                 invoice.getRefundWindowExpiry().isBefore(LocalDateTime.now())) {
             throw new RuntimeException("Refund window expired");
         }
 
         BigDecimal amount = invoice.getTotalPayable();
+        String ref = "REFUND-" + invoice.getInvoiceNumber();
 
-        Wallet merchantWallet = walletService.getWalletByUser(
-                invoice.getMerchant().getUser()
-        );
-
-
-        // 🔥 CASE 1 — Razorpay Payment (UPI_PAY or CARD)
-        if (invoice.getPaymentMethod() == PaymentMethod.UPI_PAY || invoice.getPaymentMethod() == PaymentMethod.CARD) {
-
-            // Call Razorpay refund API
+        // 3. Branch Refund Logic by Payment Method
+        if (invoice.getPaymentMethod() == PaymentMethod.FACE_PAY) {
+            log.info("💳 [FACE_PAY REFUND] Reversing internal wallet transfer");
+            walletService.updateBalanceRefundInternal(
+                    invoice.getMerchant().getUser(),
+                    invoice.getCustomer().getUser(),
+                    amount,
+                    ref
+            );
+        } else if (invoice.getPaymentMethod() == PaymentMethod.UPI_PAY || invoice.getPaymentMethod() == PaymentMethod.CARD) {
+            log.info("🌐 [EXTERNAL REFUND] Attempting Razorpay refund for invoice {}", invoice.getInvoiceNumber());
+            
+            // 🔒 SAFETY: External API call happens BEFORE wallet deduction
             razorpayService.refundPayment(
                     invoice.getTransaction().getExternalReference(),
                     amount
             );
 
-            // Debit merchant wallet
-            walletService.debit(merchantWallet, amount, "REFUND-" + invoice.getInvoiceNumber());
-        }
-
-        // 🔥 CASE 2 — FACE_PAY
-        else if (invoice.getPaymentMethod() == PaymentMethod.FACE_PAY) {
-            
-            if (invoice.getCustomer() == null) {
-                throw new RuntimeException("FacePay invoice missing customer");
-            }
-
-            Wallet customerWallet = walletService.getWalletByUser(
-                    invoice.getCustomer().getUser()
+            log.info("✅ [EXTERNAL REFUND SUCCESS] Razorpay refund successful. Proceeding to merchant escrow deduction.");
+            walletService.updateBalanceRefundExternal(
+                    invoice.getMerchant().getUser(),
+                    amount,
+                    ref
             );
-
-            // Reverse internal wallet transfer
-            String ref = "REFUND-FP-" + invoice.getInvoiceNumber();
-            walletService.debit(merchantWallet, amount, ref);
-            walletService.credit(customerWallet, amount, ref);
+        } else {
+            throw new RuntimeException("Unsupported payment method for refund: " + invoice.getPaymentMethod());
         }
 
-        else {
-            throw new RuntimeException("Unsupported payment method");
-        }
-
-        // 🧾 Create REFUND ledger entry
+        // 4. Create Refund Ledger Transaction
         Transaction refundTx = Transaction.builder()
-                .senderWallet(merchantWallet)
+                .senderWallet(null)
                 .receiverWallet(null)
-                .invoice(invoice)   // ✅ ADD THIS
+                .invoice(invoice)
                 .amount(amount)
                 .transactionType(TransactionType.REFUND)
                 .status(TransactionStatus.SUCCESS)
-                .externalReference("REFUND-" + invoice.getId())
+                .externalReference(ref)
+                .createdAt(LocalDateTime.now())
                 .build();
 
         transactionRepository.save(refundTx);
 
-        // 🔁 Update invoice status
+        // 5. Finalize Invoice Status
         invoice.setStatus(InvoiceStatus.REFUNDED);
-        invoiceRepository.save(invoice);
+        invoiceRepository.saveAndFlush(invoice);
 
-        // Notify Customer and Send Email
-        if (invoice.getCustomer() != null && invoice.getCustomer().getUser() != null) {
-            User customerUser = invoice.getCustomer().getUser();
-            notificationService.createNotification(
-                    customerUser,
-                    "Refund completed for Invoice " + invoice.getInvoiceNumber(),
-                    NotificationType.REFUND_COMPLETED
-            );
-            refundEmailService.sendRefundCompletedEmail(customerUser.getEmail(), invoice.getInvoiceNumber());
-        }
+        log.info("✅ [REFUND SUCCESS] Invoice: {} | Method: {}", invoice.getInvoiceNumber(), invoice.getPaymentMethod());
 
-        System.out.println("Refund processed for invoice: " + invoiceId);
+        // 6. Notifications
+        notificationService.sendRefundSuccessNotifications(invoice);
     }
+
     @Transactional(readOnly = true)
     public List<MerchantRefundResponse> getMerchantRefundHistory(String merchantEmail) {
 

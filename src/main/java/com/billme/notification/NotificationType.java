@@ -5,6 +5,9 @@ public enum NotificationType {
     REFUND_COMPLETED,
     INFO,
     ALERT,
+    SUCCESS,
+    ERROR,
     PAYMENT_SUCCESS,
-    PAYMENT_RECEIVED
+    PAYMENT_RECEIVED,
+    INVOICE_CREATED
 }

@@ -3,7 +3,7 @@ package com.billme.product;
 import com.billme.merchant.MerchantProfile;
 import com.billme.product.dto.ProductResponse;
 import com.billme.repository.MerchantProfileRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.billme.product.dto.CreateProductRequest;

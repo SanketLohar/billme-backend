@@ -1,5 +1,6 @@
 package com.billme.notification;
 
+import com.billme.notification.dto.NotificationResponse;
 import com.billme.user.User;
 import com.billme.invoice.Invoice;
 import com.billme.email.EmailService;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Propagation;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,23 +39,22 @@ public class NotificationService {
     public void sendPaymentNotifications(Invoice invoice) {
         log.info("🔔 Processing notifications for Invoice {}", invoice.getInvoiceNumber());
 
-        // 🚀 Initialize LAZY proxies
+        // 🚀 Capture emails BEFORE synchronization to avoid LazyInitializationException
+        String merchantEmail = null;
+        String customerEmail = null;
         try {
-            if (invoice.getMerchant() != null) {
-                invoice.getMerchant().getBusinessName();
-                if (invoice.getMerchant().getUser() != null) {
-                    invoice.getMerchant().getUser().getEmail();
-                }
+            if (invoice.getMerchant() != null && invoice.getMerchant().getUser() != null) {
+                merchantEmail = invoice.getMerchant().getUser().getEmail();
             }
-            if (invoice.getCustomer() != null) {
-                invoice.getCustomer().getName();
-                if (invoice.getCustomer().getUser() != null) {
-                    invoice.getCustomer().getUser().getEmail();
-                }
+            if (invoice.getCustomer() != null && invoice.getCustomer().getUser() != null) {
+                customerEmail = invoice.getCustomer().getUser().getEmail();
             }
         } catch (Exception e) {
-            log.warn("Proxy initialization failed: {}", e.getMessage());
+            log.warn("Failed to capture emails for notifications: {}", e.getMessage());
         }
+
+        final String finalMerchantEmail = merchantEmail;
+        final String finalCustomerEmail = customerEmail;
 
         // 1. In-App Notifications (Best Effort - Don't fail the payment)
         try {
@@ -79,20 +80,110 @@ public class NotificationService {
 
         // 3. Trigger Emails AFTER Transaction Commit (Safe Guard)
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                new org.springframework.transaction.support.TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        log.info("Transaction committed. Triggering emails for Invoice {}", invoice.getInvoiceNumber());
-                        emailService.sendCustomerPaymentSuccessEmail(invoice);
-                        emailService.sendMerchantPaymentReceivedEmail(invoice);
+            new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    log.info("📧 Attempting to send synchronized emails for Invoice {}", invoice.getInvoiceNumber());
+                    
+                    // 1. Customer Email
+                    if (finalCustomerEmail != null) {
+                        try {
+                            emailService.sendCustomerPaymentSuccessEmail(invoice);
+                        } catch (Exception e) {
+                            log.error("🚨 Failed to send customer email after commit: {}", e.getMessage());
+                        }
+                    }
+
+                    // 2. Merchant Email
+                    if (finalMerchantEmail != null) {
+                        try {
+                            emailService.sendMerchantPaymentReceivedEmail(invoice);
+                        } catch (Exception e) {
+                            log.error("🚨 Failed to send merchant email after commit: {}", e.getMessage());
+                        }
                     }
                 }
+            }
+        );
+    }
+
+    @Transactional
+    public void sendRefundRequestNotifications(Invoice invoice) {
+        log.info("🔔 Processing refund request notifications for Invoice {}", invoice.getInvoiceNumber());
+
+        try {
+            // 1. In-App: Notify Customer
+            if (invoice.getCustomer() != null && invoice.getCustomer().getUser() != null) {
+                String customerMsg = "Refund request submitted for Invoice " + invoice.getInvoiceNumber();
+                createNotification(invoice.getCustomer().getUser(), customerMsg, NotificationType.INFO);
+            }
+
+            // 2. In-App: Notify Merchant
+            if (invoice.getMerchant() != null && invoice.getMerchant().getUser() != null) {
+                String merchantMsg = "Refund request received for Invoice " + invoice.getInvoiceNumber();
+                createNotification(invoice.getMerchant().getUser(), merchantMsg, NotificationType.REFUND_REQUESTED);
+            }
+        } catch (Exception e) {
+            log.error("Failed to create in-app refund request notifications: {}", e.getMessage());
+        }
+
+        // 3. Email Notification is handled separately in RefundService for now because it needs tokens.
+        // Keeping it there to avoid complex dependency injection of RefundTokenService here.
+    }
+
+    @Transactional
+    public void sendRefundSuccessNotifications(Invoice invoice) {
+        log.info("🔔 Processing refund completion notifications for Invoice {}", invoice.getInvoiceNumber());
+
+        try {
+            // 1. In-App: Notify Customer
+            if (invoice.getCustomer() != null && invoice.getCustomer().getUser() != null) {
+                String customerMsg = "Refund completed for Invoice " + invoice.getInvoiceNumber();
+                createNotification(invoice.getCustomer().getUser(), customerMsg, NotificationType.REFUND_COMPLETED);
+            }
+
+            // 2. In-App: Notify Merchant
+            if (invoice.getMerchant() != null && invoice.getMerchant().getUser() != null) {
+                String merchantMsg = "Refund successfully processed for Invoice " + invoice.getInvoiceNumber();
+                createNotification(invoice.getMerchant().getUser(), merchantMsg, NotificationType.SUCCESS);
+            }
+        } catch (Exception e) {
+            log.error("Failed to create in-app refund completion notifications: {}", e.getMessage());
+        }
+
+        // Email Sync
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+            new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        if (invoice.getCustomer() != null && invoice.getCustomer().getUser() != null) {
+                            emailService.sendRefundCompletedEmail(invoice.getCustomer().getUser().getEmail(), invoice.getInvoiceNumber());
+                        }
+                    } catch (Exception e) {
+                        log.error("🚨 Failed to send refund completed email: {}", e.getMessage());
+                    }
+                }
+            }
         );
     }
 
     @Transactional(readOnly = true)
-    public List<Notification> getUserNotifications(User user) {
-        return notificationRepository.findByUserOrderByCreatedAtDesc(user);
+    public List<NotificationResponse> getUserNotifications(User user) {
+        return notificationRepository.findByUserOrderByCreatedAtDesc(user)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    private NotificationResponse mapToResponse(Notification notification) {
+        return NotificationResponse.builder()
+                .id(notification.getId())
+                .message(notification.getMessage())
+                .type(notification.getType())
+                .isRead(notification.isRead())
+                .createdAt(notification.getCreatedAt())
+                .build();
     }
     
     @Transactional

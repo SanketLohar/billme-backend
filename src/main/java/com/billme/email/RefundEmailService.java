@@ -89,4 +89,39 @@ public class RefundEmailService {
             log.error("Failed to send refund completed email to {}: {}", customerEmail, e.getMessage());
         }
     }
+    
+    public void sendRefundRejectedEmail(String customerEmail, String invoiceNumber, String reason) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(customerEmail);
+            helper.setSubject("Refund Request Update - Invoice #" + invoiceNumber);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <div style="max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px;">
+                        <h2 style="color: #F44336;">Refund Request Update</h2>
+                        <p>Hello,</p>
+                        <p>Your refund request for Invoice <strong>#%s</strong> has been reviewed.</p>
+                        <div style="background-color: #fce4e4; padding: 15px; border-radius: 5px; border-left: 5px solid #F44336;">
+                            <p><strong>Status:</strong> REJECTED</p>
+                            <p><strong>Reason:</strong> %s</p>
+                        </div>
+                        <p>If you have any questions, please contact the merchant directly.</p>
+                        <hr>
+                        <p>Thank you for using BillMe.</p>
+                    </div>
+                </body>
+                </html>
+            """, invoiceNumber, reason != null ? reason : "Standard merchant policy.");
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("✅ [EMAIL SENT] Refund rejected email sent to {}", customerEmail);
+        } catch (MessagingException e) {
+            log.error("🚨 [EMAIL ERROR] Failed to send refund rejected email: {}", e.getMessage());
+        }
+    }
 }

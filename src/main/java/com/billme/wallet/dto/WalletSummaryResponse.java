@@ -13,5 +13,6 @@ public class WalletSummaryResponse {
     private BigDecimal totalReceived;
     private BigDecimal totalWithdrawn;
     private BigDecimal platformFee;
+    private BigDecimal escrowBalance;
 
 }

@@ -26,4 +26,10 @@ public class PaymentController {
         invoiceService.verifyRazorpayPayment(request);
         return ResponseEntity.ok("Payment verified successfully");
     }
+
+    @PostMapping("/retry/{invoiceId}")
+    public ResponseEntity<String> retryPayment(@PathVariable Long invoiceId) {
+        String orderId = invoiceService.retryPayment(invoiceId);
+        return ResponseEntity.ok(orderId);
+    }
 }

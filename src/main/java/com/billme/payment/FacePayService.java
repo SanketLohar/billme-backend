@@ -9,7 +9,7 @@ import com.billme.repository.InvoiceRepository;
 import com.billme.repository.UserRepository;
 import com.billme.security.face.FaceRecognitionUtil;
 import com.billme.user.User;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -68,11 +68,7 @@ public class FacePayService {
         invoice.setPaymentMethod(PaymentMethod.FACE_PAY);
         invoiceRepository.save(invoice);
 
-        settlementService.settlePayment(
-                invoice,
-                invoice.getTotalPayable(),
-                "FACEPAY-" + UUID.randomUUID()
-        );
+        settlementService.settlePayment(invoiceId, "FACEPAY-" + UUID.randomUUID());
 
         return "FacePay successful";
     }

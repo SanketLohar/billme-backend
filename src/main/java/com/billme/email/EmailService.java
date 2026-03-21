@@ -9,4 +9,6 @@ public interface EmailService {
     void sendCustomerPaymentSuccessEmail(Invoice invoice);
 
     void sendMerchantPaymentReceivedEmail(Invoice invoice);
+
+    void sendRefundCompletedEmail(String to, String invoiceNumber);
 }
