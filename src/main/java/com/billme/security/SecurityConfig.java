@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers("/invoice/*/pdf").permitAll()
                         .requestMatchers("/public/**").permitAll()
                         .requestMatchers("/api/refund/email/**").permitAll()
+                        .requestMatchers("/api/payments/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .anyRequest().authenticated()
                 )

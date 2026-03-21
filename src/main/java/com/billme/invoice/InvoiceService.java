@@ -44,6 +44,7 @@ public class InvoiceService {
     private final InvoiceEmailService invoiceEmailService;
     private final WalletService walletService;
     private final InvoicePdfService invoicePdfService;
+    private final com.billme.notification.NotificationService notificationService;
     @Value("${processing.fee.percent}")
     private BigDecimal processingFeePercent;
 
@@ -604,5 +605,8 @@ public class InvoiceService {
         invoice.setPaymentInProgress(false);
         
         invoiceRepository.save(invoice);
+        
+        // 📢 Trigger Notifications
+        notificationService.sendPaymentNotifications(invoice);
     }
 }

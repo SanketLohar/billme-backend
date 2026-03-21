@@ -25,13 +25,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<?> handleRuntimeException(RuntimeException ex) {
-
+        ex.printStackTrace(); // Log for debug
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of(
                         "timestamp", LocalDateTime.now(),
-                        "status", 400,
-                        "error", ex.getMessage()
+                        "status", 500,
+                        "error", "Internal Server Error: " + ex.getMessage()
                 ));
     }
 }

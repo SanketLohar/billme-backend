@@ -9,6 +9,7 @@ import com.billme.transaction.Transaction;
 import com.billme.transaction.TransactionStatus;
 import com.billme.transaction.TransactionType;
 import com.billme.wallet.Wallet;
+import com.billme.notification.NotificationService;
 import com.billme.wallet.WalletService;
 
 import lombok.RequiredArgsConstructor;
@@ -26,15 +27,16 @@ public class PaymentSettlementService {
     private final WalletService walletService;
     private final TransactionRepository transactionRepository;
     private final InvoiceRepository invoiceRepository;
-    private final PaymentSuccessEmailService paymentSuccessEmailService;
+    private final NotificationService notificationService;
 
     @Transactional
     public void settlePayment(Invoice invoice, BigDecimal customerPayment, String paymentId) {
 
         // -----------------------------
-        // Idempotency Protection
+        // 1. Idempotency Protection
         // -----------------------------
         if (invoice.getStatus() == InvoiceStatus.PAID) {
+            System.out.println("⚠️ [IDEMPOTENCY] Invoice " + invoice.getInvoiceNumber() + " already paid. Skipping.");
             return;
         }
 
@@ -43,7 +45,7 @@ public class PaymentSettlementService {
         }
 
         // -----------------------------
-        // Extract Invoice Financials
+        // 2. Financial Reconciliation Guard
         // -----------------------------
         BigDecimal totalPayable = invoice.getTotalPayable();
         BigDecimal processingFee = invoice.getProcessingFee();
@@ -52,48 +54,30 @@ public class PaymentSettlementService {
             throw new IllegalStateException("Invoice financial data corrupted");
         }
 
+        if (customerPayment.compareTo(totalPayable) != 0) {
+            throw new IllegalStateException("Payment mismatch. Expected: " + totalPayable + " Got: " + customerPayment);
+        }
+
         BigDecimal merchantSettlement = totalPayable.subtract(processingFee);
 
         // -----------------------------
-        // FINANCIAL RECONCILIATION GUARD
+        // 3. Atomic Wallet Transfer (Customer -> Merchant Escrow)
         // -----------------------------
-
-        // 1️⃣ Customer must pay exact invoice total
-        if (customerPayment.compareTo(totalPayable) != 0) {
-            throw new IllegalStateException(
-                    "Payment amount mismatch. Expected: "
-                            + totalPayable
-                            + " but received: "
-                            + customerPayment
-            );
-        }
-
-        // 2️⃣ Platform math must balance (Invariants)
-        BigDecimal totalGst = (invoice.getCgstTotal() != null ? invoice.getCgstTotal() : BigDecimal.ZERO)
-                .add(invoice.getSgstTotal() != null ? invoice.getSgstTotal() : BigDecimal.ZERO)
-                .add(invoice.getIgstTotal() != null ? invoice.getIgstTotal() : BigDecimal.ZERO);
-
-        BigDecimal expectedCustomerPayment = invoice.getSubtotal().add(totalGst).add(processingFee);
-
-        if (expectedCustomerPayment.compareTo(customerPayment) != 0) {
-            throw new IllegalStateException("Financial reconciliation failed: subtotal + tax + fee mismatch");
-        }
+        // This call is atomic and protected by pessimistic locks inside transferFunds
+        walletService.transferFunds(
+                invoice.getCustomer().getUser(),
+                invoice.getMerchant().getUser(),
+                customerPayment,
+                paymentId
+        );
 
         // -----------------------------
-        // Merchant Wallet Settlement (TO ESCROW)
-        // -----------------------------
-        Wallet merchantWallet =
-                walletService.getWalletByUser(invoice.getMerchant().getUser());
-
-        walletService.creditEscrow(merchantWallet, merchantSettlement, paymentId);
-
-        // -----------------------------
-        // Ledger Transaction
+        // 4. Ledger Transaction & Invoice Update
         // -----------------------------
         Transaction ledgerTransaction = Transaction.builder()
-                .senderWallet(null)
-                .receiverWallet(merchantWallet)
-                .amount(customerPayment) // what customer paid
+                .senderWallet(null) // Generic ledger for now
+                .receiverWallet(null)
+                .amount(customerPayment)
                 .invoiceAmount(totalPayable)
                 .processingFee(processingFee)
                 .merchantSettlement(merchantSettlement)
@@ -105,25 +89,20 @@ public class PaymentSettlementService {
 
         transactionRepository.save(ledgerTransaction);
 
-        // -----------------------------
-        // Update Invoice
-        // -----------------------------
         invoice.setStatus(InvoiceStatus.PAID);
         invoice.setTransaction(ledgerTransaction);
         invoice.setPaidAt(LocalDateTime.now());
-
-        // Release payment lock
         invoice.setPaymentInProgress(false);
-        invoice.setPaymentStartedAt(null);
-
-        // Refund window
         invoice.setRefundWindowExpiry(LocalDateTime.now().plusDays(3));
 
         invoiceRepository.save(invoice);
 
+        System.out.println("✅ [PAYMENT SETTLED] Invoice: " + invoice.getInvoiceNumber() + " Ref: " + paymentId);
+
         // -----------------------------
-        // Send Payment Success Email
+        // 5. Trigger Notifications
         // -----------------------------
-        paymentSuccessEmailService.sendPaymentSuccessEmail(invoice);
+        // notificationService will handle in-app and async emails
+        notificationService.sendPaymentNotifications(invoice);
     }
 }

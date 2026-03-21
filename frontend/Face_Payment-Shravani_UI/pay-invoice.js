@@ -52,6 +52,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         grandTotalElem.innerText = `₹${(invoice.totalPayable || 0).toFixed(2)}`;
 
         loader.style.display = 'none';
+        
+        if (invoice.status === 'PAID') {
+            showSuccess();
+            return;
+        }
+        
         content.style.display = 'block';
 
     } catch (err) {
@@ -125,6 +131,79 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             showSuccess();
+
+        } catch (err) {
+            console.error(err);
+            showToast(err.message, 'error');
+        }
+    });
+
+    // =========================
+    // RAZORPAY UPI / CARD
+    // =========================
+    document.getElementById('btn-upi')?.addEventListener('click', async () => {
+        try {
+            const BASE_URL = "http://localhost:8080";
+            
+            // 1. Create Razorpay Order
+            const token = localStorage.getItem("billme_token");
+            const orderRes = await fetch(`${BASE_URL}/api/payments/create-order/${currentInvoice.id}`, {
+                method: "POST",
+                headers: {
+                    "Authorization": token ? `Bearer ${token}` : ""
+                }
+            });
+            
+            if (!orderRes.ok) {
+                const errText = await orderRes.text();
+                const errJson = errText.startsWith('{') ? JSON.parse(errText) : null;
+                throw new Error(errJson ? (errJson.error || errJson.message) : errText || "Failed to create payment order");
+            }
+            const orderId = await orderRes.text();
+
+            // 2. Configure Razorpay Options
+            const options = {
+                "key": "rzp_test_SIgyziHVJLgRT2", // Test Key from application.properties
+                "amount": (currentInvoice.totalPayable * 100).toString(),
+                "currency": "INR",
+                "name": "BillMe",
+                "description": `Invoice #${currentInvoice.invoiceNumber}`,
+                "order_id": orderId,
+                "handler": async function (response) {
+                    // 3. Verify Payment
+                    try {
+                        const verifyRes = await fetch(`${BASE_URL}/api/payments/verify`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature
+                            })
+                        });
+
+                        if (verifyRes.ok) {
+                            showSuccess();
+                        } else {
+                            const vErrText = await verifyRes.text();
+                            const vErrJson = vErrText.startsWith('{') ? JSON.parse(vErrText) : null;
+                            showToast(vErrJson ? (vErrJson.error || vErrJson.message) : vErrText || "Payment verification failed", "error");
+                        }
+                    } catch (err) {
+                        showToast("Verification error", "error");
+                    }
+                },
+                "prefill": {
+                    "name": currentInvoice.customerName,
+                    "email": currentInvoice.customerEmail
+                },
+                "theme": {
+                    "color": "#2563eb"
+                }
+            };
+
+            const rzp = new Razorpay(options);
+            rzp.open();
 
         } catch (err) {
             console.error(err);
